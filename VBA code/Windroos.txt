@@ -1,0 +1,79 @@
+Public Sub WindRoos()
+Dim WindChtobj As ChartObject
+Dim WindPltArea As PlotArea
+Dim WindChtArea As ChartArea
+Dim BeReiK As Range
+
+
+'Zichtbaar maken windroos in Brasnieuw
+    WNDRs.Visible = True
+
+'Aanmaken nieuw werkblad
+    WNDRs.copy Before:=WORKwbk.Sheets(1)
+       
+'ActiveSheet.Name = "Wind F."
+    Set WindF = ActiveSheet
+    WindF.Name = "Wind F."
+    
+    
+'Verbergen Windroos in Brasnieuw
+    WNDRs.Visible = False
+    
+'Gegevens in Windroos plaatsen
+    Set WdirRng = Worksheets(D_Name).Range(Eenheden & ":" & Eenheden)           'Range Eenheid Windrichting
+    WdirRng.copy
+    WindF.Range("B1").PasteSpecial Paste:=xlPasteValues, Operation:=xlNone, SkipBlanks _
+        :=False, Transpose:=False
+    Range("B2:Q2").Calculate
+    MKolom.Verwijderen "A", True
+    
+'Reeksranges aanmaken
+    Set WNDRsXValue = WindF.Range("B1:Q1")
+    Set WNDRsValue = WindF.Range("B2:Q2")
+    Set WindChtobj = ActiveSheet.ChartObjects("Grafiek 1")
+    Set windcht = WindChtobj.Chart
+    Set WindChtArea = windcht.ChartArea
+    Set WindPltArea = windcht.PlotArea
+    Set WindChtTitle = windcht.ChartTitle
+    
+'Grafiekreeks opmaken
+    windcht.SeriesCollection(1).XValues = WNDRsXValue
+    windcht.SeriesCollection(1).Values = WNDRsValue
+    
+'Worksheet formateren
+    Range("B1:T2").Columns.ColumnWidth = 10
+    Range("A:A").Columns.Hidden = True
+    
+'Grafiekachtergrond op celgebonden plaats zetten
+    Set BeReiK = ActiveSheet.Range("B3:AA40")
+    With WindChtArea
+        .Left = BeReiK.Left
+        .Top = BeReiK.Top
+        .Width = BeReiK.Width
+        .Height = BeReiK.Height
+        End With
+    
+'Grafiek grootte en plaats formatteren
+    With WindPltArea
+        .Left = BeReiK.Left
+        .Top = BeReiK.Top
+        .Width = BeReiK.Width
+        .Height = BeReiK.Height
+        End With
+        
+'Grafiektitel verplaatsen
+    Set BeReiK = ActiveSheet.Range("X4")
+    With WindChtTitle
+        .Left = BeReiK.Left
+        .Top = BeReiK.Top
+        End With
+            
+'Grafiek achtergrond opmaken
+    'Sheets("Wind F.").DrawingObjects("Grafiek 1").RoundedCorners = True
+    'Sheets("Wind F.").DrawingObjects("Grafiek 1").Shadow = False
+
+'Tabkleur aanpassen
+    Tabkleur = 8        'Turkoise
+    WindF.Tab.Color = Tabkleur
+    
+End Sub

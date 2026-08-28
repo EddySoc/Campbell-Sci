@@ -1,0 +1,648 @@
+Option Private Module
+Public Sub METEO()
+'Macro initieren met naam
+'=================================================================
+    Application.StatusBar = "Voorbereiden"
+    Application.EnableEvents = False
+    MCommon.Macro_Start "Meteo"
+    Sheets(D_Name).Select
+
+'Berekeningen en opmaak kolommen
+'=================================================================
+    Application.StatusBar = "Berekeningen Maken"
+'   Kolom DV3 naast DV1 en DV2 en LFW3 verwijderen
+    MKolom.Verwijderen "AV AS"
+    MKolom.Verplaatsen "AU", "AO", D_Name
+
+'   Tijd_halfuur omzetting voor zonnestraling
+    MKolom.Formule "AL", "=TIME(0,TRUNC(AL1*30),ROUND((AL1*30-TRUNC(AL1*30))*60,0))", "mm:ss", , 1, -1
+    
+'   Windrichting berekenen
+    Graden = "AG"
+    MKolom.Windrichting Graden
+   
+'   Omzetten van de bladnatheid naar percentage.
+    MKolom.Numberformat "W AK AL AU AV", "0%"
+    
+'   Omzetten van de Datum.
+    MKolom.Numberformat "AJ", "dd/mm/yy hh:mm"
+        
+'   Bepalen zon op of onder op basis van Zonnestraling > 5 W/m²
+    MKolom.Formule "AW", "=IF(P1>5,30,0)", "mm:ss"
+    
+'   verschil tussen kort in (CNR1) en zon (CMP6)
+    MKolom.Formule "AX", "=P1 - Z1", "0.00"
+    
+'   Albedo onderaan afknippen als Kort In < 5W
+    MKolom.Formule "W", "=IF(P1 < 5,0,W1)", "0%", , 1, -1
+
+'   Conditionele opmaak Bladnat sensoren
+    MKolom.CndOpmaakoud "AU:AV,AK:AL"
+    
+'   Kolombreedte op 10 AJ op 15 zetten
+    'ActiveSheet.Range("AJ:AJ").ColumnWidth = 18
+    
+'   Berekening "Leaf T" in Laatste Kolom
+    MKolom.Formule "AY", "=(S1/0.0000000567)^(1/4)-273.16", "0.000"
+   
+    
+'Titels plaatsen en eventueel Maskeren
+'================================================================
+    Application.StatusBar = "Titels Filteren en Plaatsen"
+    MCommon.Maskeren
+    'Titels Bijkomende berekeningen
+    With Worksheets(D_Name)
+        .Range("AY1").Value = "Leaf T."
+        .Range("AM1").Value = "Sun Half Hours"
+        .Range("AW1").Value = "DayLight"
+        .Range("AX1").Value = "Solar_R_I - SOLAR_RAD"
+    End With
+    MCommon.Titels_ZoekEnPlaats
+'GRAFIEKEN
+'================================================================
+    Application.StatusBar = "Grafieken Maken"
+
+    'Wind gerelateerde grafieken
+    Tabkleur = 8    'Turkoise
+    MGraphs.Builder "Wind", DATAsht.Name, xlLine, "A AC AD AF ai", "", "", "", "Gesplitst"
+    MGraphs.Builder "Wind 40 m", DATAsht.Name, xlLine, "A AE AF", "", "", "", "False"
+    MGraphs.Builder "VGL Wind 40m", DATAsht.Name, xlXYScatter, "AF AE", "", "", "", "False"
+    MGraphs.Builder "WindRichting", DATAsht.Name, xlLine, "A AG", "360", "0", "", "False"
+    MGraphs.Builder "Luchtdruk", DATAsht.Name, xlLine, "A O", "", "", "", "False"
+    
+    'Temperatuur gerelateerde grafieken
+    Tabkleur = 3    'Rood
+    MGraphs.Builder "Droge T", DATAsht.Name, xlLine, "A G H I ay", "", "", "", "Gesplitst"
+    MGraphs.Builder "Bodem T", DATAsht.Name, xlLine, "A C D x y aa", "", "", "", "Gesplitst"
+    MGraphs.Builder "Cabine T", DATAsht.Name, xlLine, "A F", "", "", "", "False"
+    
+    'Neerslag gerelateerde grafieken
+    Tabkleur = 5    'Blauw
+    MGraphs.Builder "Neerslag", DATAsht.Name, xlLine, "A aq AN AO AP", "", "", "", "Gesplitst"
+    MGraphs.Builder "Decagon", DATAsht.Name, xlLine, "A aq AS AT", "", "", "", "Gesplitst"
+    MGraphs.Builder "Bladnat", DATAsht.Name, xlLine, "A aq AK AL", "", "", "", "Gesplitst"
+    MGraphs.Builder "RV", DATAsht.Name, xlLine, "A J K L", "", "", "", "False"
+    MGraphs.Builder "GWT", DATAsht.Name, xlLine, "A AB aa", "", "", "", "False"
+       
+    'Zonnestraling gerelateerde grafieken
+    Tabkleur = 6    'Geel
+    MGraphs.Builder "Straling", DATAsht.Name, xlLine, "A Z P aa v", "", "", "", "False"
+    MGraphs.Builder "Albedo", DATAsht.Name, xlLine, "A W", "", "", "", "False"
+    MGraphs.Builder "CNR1", DATAsht.Name, xlLine, "A P Q r s", "", "", "", "False"
+    MGraphs.Builder "CMP6", DATAsht.Name, xlLine, "A Z", "", "", "", "False"
+    'MGraphs.Builder "Leaf T", DATAsht.Name, xlLine, "A AA", "", "", "", "False"
+    'MGraphs.Builder "BF3", DATAsht.Name, xlLine, "A M N", "", "","", "False"
+    MGraphs.Builder "VGL CNR1_CMP6", DATAsht.Name, xlXYScatter, "P Z", "", "", "", "False"
+    'MGraphs.Builder "VGL CNR1_REBBS", DATAsht.Name, xlXYScatter, "V AA", "", "", "", "False"
+    'MGraphs.Builder "VGL CMP6_REBBS", DATAsht.Name, xlXYScatter, "Z AA", "", "", "", "False"
+    'MGraphs.Builder "Lijn CNR1_REBBS", DATAsht.Name, xlLine, "V AA", "", "", "", "Gesplitst"
+     
+'DRAAITABELLEN
+'================================================================
+    'Draaitabellen en grafiek maken (Uren Zon, ETO en Natheid)
+    MDraaitab.Natheid
+    
+'GRAFIEKEN dRAAITABELLEN
+'================================================================
+ 
+    Tabkleur = 6    'Geel
+    MGraphs.Builder "ETO", "Dagwaarden", xlColumnClustered, "A M", "", "", "", "False"
+    MGraphs.Builder "Uren Zon", "Dagwaarden", xlColumnClustered, "A N", "", "", "h:mm;@", "False"
+   
+    Tabkleur = 5    'Blauw
+    MGraphs.Builder "Natheid", "Dagwaarden", xlColumnClustered, "A B C D E g h j k", "", "", "", "False"
+    Sheets("Natheid").Move after:=Sheets("GWT")
+    
+    
+
+    'Windroos maken
+    MGraphs.WindRoos
+   
+'Afwerken
+'================================================================
+    Application.StatusBar = "Afwerken"
+'   Overtollige Werkbladen verwijderen.
+    Sheets(Array(DT_Name, "Blad4")).Select
+    ActiveWindow.SelectedSheets.Delete
+    
+'   Werkbladen schikken
+    Tabkleur = 19        'Wit
+    Sheets("DagWaarden").Move after:=Sheets(D_Name)
+    Sheets("DagWaarden").Tab.Color = Tabkleur
+    Sheets(D_Name).Tab.Color = Tabkleur
+
+'   Einde
+    MCommon.Macro_Einde
+    Sheets("Wind F.").Select
+    Application.StatusBar = False
+    Application.EnableEvents = True
+End Sub
+
+Public Sub TDR_PA()
+
+'Macro initieren met naam
+'=================================================================
+    Application.EnableEvents = False
+    Application.StatusBar = "Voorbereiden"
+    MCommon.Macro_Start "TDR_PA_" & Loca
+
+    Sheets(D_Name).Select
+
+'Berekeningen en opmaak kolommen
+'=================================================================
+    Application.StatusBar = "Berekeningen Maken"
+      
+'Titels plaatsen en eventueel Maskeren
+'================================================================
+    Application.StatusBar = "Titels Filteren ene Plaatsen"
+    MCommon.Maskeren
+    MCommon.Titels_ZoekEnPlaats
+
+ 
+'GRAFIEKEN
+'================================================================
+    Application.StatusBar = "Grafieken Maken"
+    MGraphs.Builder "PA Put A", DATAsht.Name, xlLine, "A D E F G", "", "", "", "False"
+    MGraphs.Builder "PA Put B", DATAsht.Name, xlLine, "A H I J K", "", "", "", "False"
+    MGraphs.Builder "PA Put C", DATAsht.Name, xlLine, "A L M N O", "", "", "", "False"
+    MGraphs.Builder "Temp", DATAsht.Name, xlLine, "A P Q R S", "", "", "", "False"
+    MGraphs.Builder "PA Lvl 1", DATAsht.Name, xlLine, "A D H L p", "", "", "", "False"
+    MGraphs.Builder "PA Lvl 2", DATAsht.Name, xlLine, "A E I M q", "", "", "", "False"
+    MGraphs.Builder "PA Lvl 3", DATAsht.Name, xlLine, "A F J N r", "", "", "", "False"
+    MGraphs.Builder "PA Lvl 4", DATAsht.Name, xlLine, "A G K O s", "", "", "", "False"
+    MGraphs.Builder "Batterij", DATAsht.Name, xlLine, "A T", "", "", "", "False"
+    MGraphs.Builder "Pan.Temp", DATAsht.Name, xlLine, "A U", "", "", "", "False"
+'Afwerken
+'================================================================
+    Application.StatusBar = "Afwerken"
+    MCommon.Macro_Einde
+    Application.StatusBar = False
+    Application.EnableEvents = True
+End Sub
+
+Public Sub WX_Station(plot)
+
+'Macro initieren met naam
+'=================================================================
+    Application.EnableEvents = False
+    Application.StatusBar = "Voorbereiden"
+    MCommon.Macro_Start "WX_" & plot
+
+    Sheets(D_Name).Select
+    Select Case plot
+        Case "ZON", "WIJ"
+            MKolom.Invoegen "O"
+            'MKolom.Verwijderen "C"  'PlotNummer vewijderen
+        Case "GRIM"
+            MKolom.Verwijderen "O N L K"
+            MKolom.Invoegen "P P P P P"
+        Case "BRA"
+            'MKolom.Verwijderen "O M L"
+            'MKolom.Invoegen "M M M M M C"
+            If [C1] <> "Plot" Then MKolom.Invoegen "C"
+    End Select
+    
+
+'Berekeningen en opmaak kolommen
+'=================================================================
+    Application.StatusBar = "Berekeningen Maken"
+'Windrichting berekenen
+ 'Eenheid = "F"
+ 
+    Graden = "E"
+    MKolom.Windrichting Graden
+  
+ 'Kolommen met 2 cijfers na de comma
+    MKolom.Numberformat "D E G H I J K P", "0.00"
+ 
+ 'Eenheid windrichting centreren
+    MKolom.Eigenschap "E", xlCenter, ""
+ 
+ 'KolomBreedte op 11 zetten
+    MKolom.Eigenschap "A B C D E F G H I J K L M N O P Q R S", 0, "11"
+ 
+ 'Titels plaatsen en eventueel Maskeren
+'================================================================
+    Application.StatusBar = "Titels Filteren en plaatsen"
+    MCommon.Maskeren
+    MCommon.Titels_ZoekEnPlaats
+ 
+'GRAFIEKEN
+'================================================================
+    Application.StatusBar = "Grafieken Maken"
+'Common Graphs
+    MGraphs.Builder "Wind", DATAsht.Name, xlLine, "A G H e", "", "", "", "Gesplitst"
+    MGraphs.Builder "RV", DATAsht.Name, xlLine, "A J", "", "", "", "False"
+    MGraphs.Builder "Baro", DATAsht.Name, xlLine, "A K", "", "", "", "False"
+    MGraphs.Builder "Neerslag", DATAsht.Name, xlLine, "A L q r", "", "", "", "Zelfde Nul-As"
+    MGraphs.Builder "Temp", DATAsht.Name, xlLine, "A I", "", "", "", "true"
+          
+    Select Case plot
+    Case "WIJ", "ZON", "GRIM"
+    'Naargelang Straling voorhanden is
+    MGraphs.Builder "Straling", DATAsht.Name, xlLine, "A N O", "", "", "", "False"
+    MGraphs.Builder "Uren Zon", DATAsht.Name, xlColumnClustered, "A X", "", "", "", "False"
+
+    Case "WIJ", "ZON", "GRIM"
+    'Naargelang Bladnat voorhanden is
+    MGraphs.Builder "Bladnat", DATAsht.Name, xlLine, "A V", "", "", "", "False"
+        
+    Case "BRA"
+        'Vgl WXT520 vs Rain-E
+        'MGraphs.Builder "VGL Intens", DATAsht.Name, xlXYScatter, "Q R", "", "", "", "False"
+        'MGraphs.Builder "VGL Precip1", DATAsht.Name, xlXYScatter, "L R", "", "", "", "False"
+        'MGraphs.Builder "VGL Precip2", DATAsht.Name, xlXYScatter, "L Q", "", "", "", "False"
+        MGraphs.Builder "Wxt vs TB", DATAsht.Name, xlLine, "A L r", "", "", "", "Gesplitst"
+        MGraphs.Builder "Wxt vs WB", DATAsht.Name, xlLine, "A L q", "", "", "", "Gesplitst"
+        MGraphs.Builder "TB vs WB", DATAsht.Name, xlLine, "A P r", "", "", "", "Gesplitst"
+
+    End Select
+    
+' windroos toevoegen
+    MGraphs.WindRoos
+    MGraphs.Builder "Batterij", DATAsht.Name, xlLine, "A D", "", "", "", "False"
+
+'Afwerken
+'================================================================
+    Application.StatusBar = "Afwerken"
+    MCommon.Macro_Einde
+    Sheets("Wind F.").Select
+    Application.StatusBar = False
+    Application.EnableEvents = True
+End Sub
+
+
+
+Public Sub Testen()
+'Macro initieren met naam
+'=================================================================
+    Application.EnableEvents = False
+    Application.StatusBar = "Voorbereiden"
+    MCommon.Macro_Start "Test"
+    
+    Sheets(D_Name).Select
+
+'Berekeningen en opmaak kolommen
+'=================================================================
+    Application.StatusBar = "Berekeningen Maken"
+
+
+'Titels plaatsen en eventueel Maskeren
+'================================================================
+    Application.StatusBar = "Titels Filteren en Plaatsen"
+    MCommon.Maskeren
+    MCommon.Titels_ZoekEnPlaats
+    
+'GRAFIEKEN
+'================================================================
+    Application.StatusBar = "Grafieken Maken"
+    MGraphs.TestGrafieken
+    
+'Afwerken
+'================================================================
+    Application.StatusBar = "Afwerken"
+'   Overtollige Werkbladen verwijderen.
+    'Sheets(Array("Hulp", "Blad2")).Select
+    'ActiveWindow.SelectedSheets.Delete
+    
+'   Werkbladen schikken
+    Tabkleur = 19        'Wit
+    Worksheets(D_Name).Tab.Color = Tabkleur
+
+'   Einde
+    MCommon.Macro_Einde
+    Application.StatusBar = False
+    Application.EnableEvents = True
+End Sub
+
+Public Sub IMMISSIE()
+'Macro initieren met naam
+'=================================================================
+    Application.EnableEvents = False
+    Application.StatusBar = "Voorbereiden"
+    MCommon.Macro_Start "IMMISSIE"
+    
+    Sheets(D_Name).Select
+
+'Berekeningen en opmaak kolommen
+'=================================================================
+    Application.StatusBar = "Berekeningen Maken"
+        
+
+'Titels plaatsen en eventueel Maskeren
+'================================================================
+    Application.StatusBar = "Titels Filteren en Plaatsen"
+    MCommon.Maskeren
+    MCommon.Titels_ZoekEnPlaats
+    
+    
+    'MGraphs.ScrollBar 'grafiek en scrollbar op worksheet plaatsen
+
+'GRAFIEKEN
+'================================================================
+    Application.StatusBar = "Grafieken Maken"
+    Tabkleur = 8    'Turkoise
+    MGraphs.Builder "Batterij", DATAsht.Name, xlLine, "A C", "", "", "", "False"
+    MGraphs.Builder "O3", DATAsht.Name, xlLine, "A G k", "", "", "", "Gesplitst"
+    MGraphs.Builder "O3N", DATAsht.Name, xlLine, "A F j", "", "", "", "Gesplitst"
+    MGraphs.Builder "O3-O3N", DATAsht.Name, xlLine, "A G f", "", "", "", "Gesplitst"
+    MGraphs.Builder "O3 Vgl", DATAsht.Name, xlXYScatter, "G F", "", "", "", "False"
+    MGraphs.Builder "O3-NOx", DATAsht.Name, xlLine, "A G h i", "", "", "", "Gesplitst"
+    MGraphs.Builder "NO", DATAsht.Name, xlLine, "A H l", "", "", "", "Gesplitst"
+    MGraphs.Builder "NO2", DATAsht.Name, xlLine, "A I m", "", "", "", "Gesplitst"
+    MGraphs.Builder "NOx Waarden", DATAsht.Name, xlLine, "A H i", "", "", "", "Gesplitst"
+    MGraphs.Builder "CO2", DATAsht.Name, xlLine, "A N", "", "", "", "False"
+    MGraphs.Builder "Temp", DATAsht.Name, xlLine, "A D", "", "", "", "False"
+    'MGraphs.Builder "Test", DATAsht.Name, xlLine, "A O n", "", "", "", "Gesplitst"
+    Tabkleur = 3
+    MKolom.Fluxen "Flux" 'benodigde kolommen copieren naar nieuw blad en splitsen per hoogte
+    MGraphs.Fluxen
+'Afwerken
+'================================================================
+    Application.StatusBar = "Afwerken"
+'   Overtollige Werkbladen verwijderen.
+    'Sheets(Array("Hulp", "Blad2")).Select
+    'ActiveWindow.SelectedSheets.Delete
+    
+'   Werkbladen schikken
+    Tabkleur = 19        'Wit
+    Worksheets(D_Name).Tab.Color = Tabkleur
+'   Einde
+    MCommon.Macro_Einde
+    Application.StatusBar = False
+    Application.EnableEvents = True
+End Sub
+
+
+Public Sub XXXXXXX()
+'Macro initieren met naam
+'=================================================================
+    Application.EnableEvents = False
+    Application.StatusBar = "Voorbereiden"
+    MCommon.Macro_Start "xxxxx"
+    Sheets(D_Name).Select
+
+'Berekeningen en opmaak kolommen
+'=================================================================
+    Application.StatusBar = "Berekeningen Maken"
+
+'Titels plaatsen en eventueel Maskeren
+'================================================================
+    Application.StatusBar = "Titels Filteren en Plaatsen"
+    MCommon.Maskeren
+    MCommon.Titels_ZoekEnPlaats
+    
+'GRAFIEKEN
+'================================================================
+    Application.StatusBar = "Grafieken Maken"
+    Tabkleur = 8    'Turkoise
+    'MGraphs.Builder "Wind", DATAsht.Name, xlLine, "A AC AD AE AF", "", "", "","False"
+    'MGraphs.WindRoos
+
+'Afwerken
+'================================================================
+    Application.StatusBar = "Afwerken"
+'   Overtollige Werkbladen verwijderen.
+    'Sheets(Array("Hulp", "Blad2")).Select
+    'ActiveWindow.SelectedSheets.Delete
+    
+'   Werkbladen schikken
+    Tabkleur = 19        'Wit
+    Worksheets(D_Name).Tab.Color = Tabkleur
+    
+'   Einde
+    MCommon.Macro_Einde
+    Application.StatusBar = False
+    Application.EnableEvents = True
+End Sub
+
+'ICOS========================================================
+Public Sub ICOS_Soil()
+'Macro initieren met naam
+'=================================================================
+    Application.EnableEvents = False
+    Application.StatusBar = "Voorbereiden"
+    MCommon.Macro_Start "ICOS_Soil_Profile_Avg"
+    Sheets(D_Name).Select
+
+'Berekeningen en opmaak kolommen
+'=================================================================
+    Application.StatusBar = "Berekeningen Maken"
+
+
+'Titels plaatsen en eventueel Maskeren
+'================================================================
+    Application.StatusBar = "Titels filteren en plaatsen"
+    MCommon.Maskeren
+    MCommon.Titels_ZoekEnPlaats
+        
+'GRAFIEKEN
+'================================================================
+    Application.StatusBar = "Grafieken Maken"
+    Tabkleur = 8    'Turkoise
+    'MGraphs.Builder "Wind", DATAsht.Name, xlLine, "A AC AD AE AF", "", "", "","False"
+    'MGraphs.WindRoos
+    MGraphs.Builder "TS_1", DATAsht.Name, xlLine, "A C D E F G H", "", "", "", "False"
+    MGraphs.Builder "TS_2", DATAsht.Name, xlLine, "A I J K L M N", "", "", "", "False"
+    MGraphs.Builder "TS_3", DATAsht.Name, xlLine, "A O P Q R S T", "", "", "", "False"
+    MGraphs.Builder "TS_4", DATAsht.Name, xlLine, "A U V W X Y Z", "", "", "", "False"
+    
+    MGraphs.Builder "SWC_1", DATAsht.Name, xlLine, "A AA AB AC AD AE", "", "", "", "False"
+    MGraphs.Builder "SWC_2", DATAsht.Name, xlLine, "A AF AG AH AI AJ", "", "", "", "False"
+    MGraphs.Builder "SWC_3", DATAsht.Name, xlLine, "A AK AL AM AN AO", "", "", "", "False"
+    MGraphs.Builder "SWC_4", DATAsht.Name, xlLine, "A AP AQ AR AS AT", "", "", "", "False"
+    
+    
+    MGraphs.Builder "shf", DATAsht.Name, xlLine, "A AU AV AW AX", "", "", "", "False"
+    MGraphs.Builder "V_RF", DATAsht.Name, xlLine, "A AY AZ BA BB", "", "", "", "False"
+    MGraphs.Builder "Water_Depht", DATAsht.Name, xlLine, "A BC BD BE BF", "", "", "", "False"
+       
+    
+'Afwerken
+'================================================================
+    Application.StatusBar = "Afwerken"
+'   Overtollige Werkbladen verwijderen.
+    'Sheets(Array("Hulp", "Blad2")).Select
+    'ActiveWindow.SelectedSheets.Delete
+    
+'   Werkbladen schikken
+    Tabkleur = 19        'Wit
+    Worksheets(D_Name).Tab.Color = Tabkleur
+    
+'   Einde
+    MCommon.Macro_Einde
+    Application.StatusBar = False
+    Application.EnableEvents = True
+End Sub
+
+'ICOS========================================================
+Public Sub ICOS_Flux(H)
+'Macro initieren met naam
+'=================================================================
+    Application.EnableEvents = False
+    Application.StatusBar = "Voorbereiden"
+    MCommon.Macro_Start "ICOS_Flux_" & H
+    Sheets(D_Name).Select
+
+'Berekeningen en opmaak kolommen
+'=================================================================
+    Application.StatusBar = "Berekeningen Maken"
+    
+
+'Titels plaatsen en eventueel Maskeren
+'================================================================
+    Application.StatusBar = "Titels Filteren en Plaatsen"
+    MCommon.Maskeren
+    MCommon.Titels_ZoekEnPlaats
+        
+'GRAFIEKEN
+'================================================================
+    Application.StatusBar = "Grafieken Maken"
+    Tabkleur = 8    'Turkoise
+    'MGraphs.Builder "Wind", DATAsht.Name, xlLine, "A AC AD AE AF", "", "", "","False"
+    'MGraphs.WindRoos
+    MGraphs.Builder "3D Vector", DATAsht.Name, xlLine, "A C D E", "", "", "", "False"
+    MGraphs.Builder "TS", DATAsht.Name, xlLine, "A F", "", "", "", "False"
+    MGraphs.Builder "CO2D", DATAsht.Name, xlLine, "A G", "", "", "", "False"
+    MGraphs.Builder "CO2mfd", DATAsht.Name, xlLine, "A K", "", "", "", "False"
+    MGraphs.Builder "Pres Dpres", DATAsht.Name, xlLine, "A I J", "", "", "", "False"
+    MGraphs.Builder "H2OD", DATAsht.Name, xlLine, "A H", "", "", "", "False"
+    MGraphs.Builder "H2Omfd", DATAsht.Name, xlLine, "A L", "", "", "", "False"
+    MGraphs.Builder "AVG Temp TempIn TempOut", DATAsht.Name, xlLine, "A M N O", "", "", "", "False"
+    MGraphs.Builder "VolFlowRate FlowPres", DATAsht.Name, xlLine, "A P Q", "", "", "", "False"
+    MGraphs.Builder "CO2aw CO2awo", DATAsht.Name, xlLine, "A T U", "", "", "", "False"
+    MGraphs.Builder "H2Oaw H2Oawo", DATAsht.Name, xlLine, "A R S", "", "", "", "False"
+'Afwerken
+'================================================================
+    Application.StatusBar = "Afwerken"
+'   Overtollige Werkbladen verwijderen.
+    'Sheets(Array("Hulp", "Blad2")).Select
+    'ActiveWindow.SelectedSheets.Delete
+    
+'   Werkbladen schikken
+    Tabkleur = 19        'Wit
+    Worksheets(D_Name).Tab.Color = Tabkleur
+    
+'   Einde
+    MCommon.Macro_Einde
+    Application.StatusBar = False
+    Application.EnableEvents = True
+End Sub
+
+'ICOS========================================================
+Public Sub ICOS_Meteo()
+'Macro initieren met naam
+'=================================================================
+    Application.EnableEvents = False
+    Application.StatusBar = "Voorbereiden"
+    MCommon.Macro_Start "ICOS_Flux_Meteo"
+    Sheets(D_Name).Select
+
+'Berekeningen en opmaak kolommen
+'=================================================================
+    Application.StatusBar = "Berekeningen Maken"
+
+'Titels plaatsen en eventueel Maskeren
+'================================================================
+    Application.StatusBar = "Titels Filteren en Plaatsen"
+    MCommon.Maskeren
+    MCommon.Titels_ZoekEnPlaats
+        
+'GRAFIEKEN
+'================================================================
+    Application.StatusBar = "Grafieken Maken"
+    Tabkleur = 8    'Turkoise
+    'MGraphs.Builder "Wind", DATAsht.Name, xlLine, "A AC AD AE AF", "", "", "","False"
+    'MGraphs.WindRoos
+    MGraphs.Builder "Rad. CNR4", DATAsht.Name, xlLine, "A C E D F", "", "", "", "False"
+    MGraphs.Builder "RH", DATAsht.Name, xlLine, "A I", "", "", "", "False"
+    MGraphs.Builder "Temp", DATAsht.Name, xlLine, "A G H", "", "", "", "False"
+    MGraphs.Builder "PPFD", DATAsht.Name, xlLine, "A J K", "", "", "", "False"
+    MGraphs.Builder "PA", DATAsht.Name, xlLine, "A L", "", "", "", "False"
+    
+'Afwerken
+'================================================================
+    Application.StatusBar = "Afwerken"
+'   Overtollige Werkbladen verwijderen.
+    'Sheets(Array("Hulp", "Blad2")).Select
+    'ActiveWindow.SelectedSheets.Delete
+    
+'   Werkbladen schikken
+    Tabkleur = 19        'Wit
+    Worksheets(D_Name).Tab.Color = Tabkleur
+    
+'   Einde
+    MCommon.Macro_Einde
+    Application.StatusBar = False
+    Application.EnableEvents = True
+End Sub
+
+'ICOS=============================================================
+Public Sub ICOS_LI8100A()
+'Macro initieren met naam
+'=================================================================
+    Application.EnableEvents = False
+    Application.StatusBar = "Voorbereiden"
+    MCommon.Macro_Start "ICOS_LI8100"
+    Sheets(D_Name).Select
+'Stuktuur herwerken data en diagnostics
+'=================================================================
+    Application.StatusBar = "DataStuktuur herwerken"
+    MIcos.CleanUpBack
+    MCommon.Titels_ZoekEnPlaats
+    LastRow = LastRowColumn(Worksheets(D_Name), "R")
+    MKolom.kopy "C", "ICOS_LI8100", "B"
+    MKolom.Verwijderen "A", True
+    MKolom.Numberformat "A", "dd/mm/yyyy"
+    MKolom.Numberformat "B", "hh:mm:ss.0"
+    Range("A1").Value = "DATUM"
+    Range("B1").Value = "TIJD"
+    Range("C1").Value = "Port#"
+    Range("J1").Value = "V1 - Flow"
+    Range("K1").Value = "V2 - NA"
+    Range("L1").Value = "V3 - Temp"
+    Range("M1").Value = "V4 - TDR"
+    Dticks = MFuncties.DaySticks
+
+'Berekeningen en opmaak kolommen
+'=================================================================
+    Application.StatusBar = "Berekeningen Maken"
+
+'Titels plaatsen en eventueel Maskeren
+'================================================================
+    Application.StatusBar = "Titels Filteren en Plaatsen"
+    MCommon.Maskeren
+    MCommon.Titels_ZoekEnPlaats
+    
+'GRAFIEKEN
+'================================================================
+    Application.StatusBar = "Grafieken Maken"
+    Tabkleur = 8    'Turkoise
+    MGraphs.Builder "TCham", DATAsht.Name, xlLine, "A D", "", "", "", "False"
+    MGraphs.Builder "Pressure", DATAsht.Name, xlLine, "A E", "", "", "", "False"
+    MGraphs.Builder "RH", DATAsht.Name, xlLine, "A S", "", "", "", "False"
+    MGraphs.Builder "H2O", DATAsht.Name, xlLine, "A F", "", "", "", "False"
+    MGraphs.Builder "CO2", DATAsht.Name, xlLine, "A G", "", "", "", "False"
+    Tabkleur = 5
+    MGraphs.Builder "TBench & TBoard", DATAsht.Name, xlLine, "A I T", "", "", "", "False"
+    MGraphs.Builder "V1", DATAsht.Name, xlLine, "A J", "", "", "", "False"
+    MGraphs.Builder "V2", DATAsht.Name, xlLine, "A K", "", "", "", "False"
+    MGraphs.Builder "V3", DATAsht.Name, xlLine, "A L", "", "", "", "False"
+    MGraphs.Builder "V4", DATAsht.Name, xlLine, "A M", "", "", "", "False"
+    MGraphs.Builder "Vin", DATAsht.Name, xlLine, "A U", "", "", "", "False"
+    
+'Afwerken
+'================================================================
+    Application.StatusBar = "Afwerken"
+'   Overtollige Werkbladen verwijderen.
+     
+'   Werkbladen schikken
+    Tabkleur = 19        'Wit
+    Worksheets(D_Name).Tab.Color = Tabkleur
+    
+'   Einde
+    MCommon.Macro_Einde
+    Charts("TCham").Select
+    Application.StatusBar = False
+    Application.EnableEvents = True
+End Sub

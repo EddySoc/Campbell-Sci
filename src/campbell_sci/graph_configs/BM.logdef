@@ -1,0 +1,19 @@
+# name;type;columns;minimum;maximum;number format;tab color
+Wind;line;TIMESTAMP,Wind_24_m_Avg,Wind_32_m_Avg,Wind_40_m,Wind_40_m_TMx@secondary;;;0.0;00FFFF
+Wind 40 m;line;TIMESTAMP,Wind_40_m_old_Avg,Wind_40_m;;;0.0;00FFFF
+VGL Wind 40m;scatter;Wind_40_m,Wind_40_m_old_Avg;;;0.0;00FFFF
+WindRichting;line;TIMESTAMP,Wind_Dir_WVT;0;360;0.0;00FFFF
+Luchtdruk;line;TIMESTAMP,Barometer_Avg;;;0.0;FF0000
+Droge T;line;TIMESTAMP,Temp_02_m_Avg,Temp_24_m_Avg,Temp_40_m_Avg,Leaf T.@secondary;;;0.0;FF0000
+Bodem T;line;TIMESTAMP,S_Temp_1_Avg,S_Temp_2_Avg,H_Flux_1_Avg@secondary,H_Flux_2_Avg@secondary,Net_Rad_Avg@secondary;;;0.0;FF0000
+Cabine T;line;TIMESTAMP,Temp_Cab_Avg;;;0.0;FF0000
+Neerslag;line;TIMESTAMP,lfWet_(1)@secondary,T_Fall_2_Tot,Precipit_Tot,ETo;;;0.0;0000FF
+Bladnat;line;TIMESTAMP,lfWet_(1)@secondary,Wet_Gr_SW_Hst,Sun_Hours_Tot;;;0.0;0000FF
+RV;line;TIMESTAMP,R_H_02_m_Avg,R_H_24_m_Avg,R_H_40_m_Avg;;;0.0;0000FF
+GWT;line;TIMESTAMP,H20_Depth_Avg,Net_Rad_Avg@secondary;;;0.0;0000FF
+Straling;line;TIMESTAMP,Solar_Rad_Avg,Solar_R_I_Avg,Net_Rad_Avg@secondary,Total_Net_Avg@secondary;;;0.0;FFFF00
+Albedo;line;TIMESTAMP,Albedo_Avg;;;0.0;FFFF00
+CNR1;line;TIMESTAMP,Solar_R_I_Avg,Solar_R_R_Avg,IR_R_I_Avg@secondary,IR_R_R_Avg@secondary;;;0.0;FFFF00
+CMP6;line;TIMESTAMP,Solar_Rad_Avg;;;0.0;FFFF00
+VGL CNR1_CMP6;scatter;Solar_R_I_Avg,Solar_Rad_Avg;;;0.0;FFFF00
+VGL test;scatter;S_Temp_1_Avg,S_Temp_2_Avg;;;0.0;FFFF00

@@ -1,0 +1,2 @@
+[console_scripts]
+campbell-sci = campbell_sci.main:main

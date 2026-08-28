@@ -1,0 +1,11 @@
+README.md
+pyproject.toml
+src/campbell_sci/__init__.py
+src/campbell_sci/main.py
+src/campbell_sci/parser.py
+src/campbell_sci.egg-info/PKG-INFO
+src/campbell_sci.egg-info/SOURCES.txt
+src/campbell_sci.egg-info/dependency_links.txt
+src/campbell_sci.egg-info/entry_points.txt
+src/campbell_sci.egg-info/requires.txt
+src/campbell_sci.egg-info/top_level.txt

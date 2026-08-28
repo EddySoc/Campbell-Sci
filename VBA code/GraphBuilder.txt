@@ -1,0 +1,243 @@
+Public Sub Builder(strChart_Name As String, D_Name, intchart_type As Integer, Kolommen As String, Maximum As Variant, Minimum As Variant, NumFormat As String, Separated As String)
+    Dim DATAsht As Worksheet
+    Dim rngData, Ldata, Rdata As Range
+    Dim chtChart As Chart
+    Dim ChtSeries As series
+    Dim x, grp As Integer
+    Dim r As Integer
+    Dim rng, Rrng, Lrng, kol() As String
+    Dim dat As Date
+    Dim RMaxMum, RMinMum, LMaxMum, LMinMum As Variant
+    Dim XVal(10, 3) As Variant     'Array 10 grafieken , 3 gegevens (Titel range, Data range, Axisgroup)
+    Dim CatAs As Variant           'Range Categorie As
+   Application.StatusBar = "Grafiek " & strChart_Name & " aanmaken"
+   WORKwbk.Activate
+    'Select DATAsht ......................................................
+    Set DATAsht = ActiveWorkbook.Worksheets(D_Name)
+    DATAsht.Select
+      
+    'CALC Range    First column = Y-Axis
+    Rrng = ""
+    Lrng = ""
+    kol = Split(Kolommen, " ")
+    'xData
+    XVal(0, 0) = kol(0) & "1:" & kol(0) & LastRow
+    For XX = 1 To UBound(kol)
+        'Titel
+        XVal(XX, 1) = kol(XX) & "1"
+        'yData
+        XVal(XX, 2) = kol(XX) & "2:" & kol(XX) & LastRow
+        'AxisGroup
+        If kol(XX) = UCase(kol(XX)) Then
+            'Primaire as
+            XVal(XX, 3) = 1
+            'Range primaire group nodig voor MIN en MAX
+            If Lrng = "" Then Lrng = XVal(XX, 2) Else Lrng = Lrng & "," & XVal(XX, 2)
+            Set Ldata = DATAsht.Range(Lrng)
+            Else
+            'Secundaire as
+            XVal(XX, 3) = 2
+            'Range Secundaire group nodig voor MIN en MAX
+            If Rrng = "" Then Rrng = XVal(XX, 2) Else Rrng = Rrng & "," & XVal(XX, 2)
+            Set Rdata = DATAsht.Range(UCase(Rrng))
+            End If
+        Next
+        
+    'Range CategorieAS
+    CatAs = kol(0) & "2:" & kol(0) & LastRow
+           
+    'DELETE Previous Chart with same name
+    For Each chtChart In ActiveWorkbook.Charts
+        If chtChart.Name = strChart_Name Then
+            Application.DisplayAlerts = False
+            chtChart.Delete
+            Application.DisplayAlerts = False
+            Exit For
+        End If
+    Next chtChart
+    
+    'OPMAAK GRAFIEK
+    '=======================================================================
+    'Standaard settings
+    Set chtChart = Charts.Add
+    chtChart.Name = strChart_Name
+    chtChart.ChartType = intchart_type
+    chtChart.Location xlLocationAsNewSheet
+    chtChart.HasTitle = False
+    If Tabkleur <> 0 Then chtChart.Tab.ColorIndex = Tabkleur
+    'Set StartColors for lines an columns
+    Lk = 0
+    OVk = 33
+    
+    'Standaard Formaat Assen
+    chtChart.HasAxis(xlValue, xlPrimary) = True
+    chtChart.HasAxis(xlValue, xlSecondary) = True
+    chtChart.HasAxis(xlCategory) = True
+    
+    'CategorieAs Algemeen
+    chtChart.Axes(xlCategory).CategoryType = xlCategoryScale
+    'chtChart.Axes(xlCategory).BaseUnit = xlDays
+    
+    'CategorieAs lettertype
+    chtChart.Axes(xlCategory).TickLabels.AutoScaleFont = True
+    chtChart.Axes(xlCategory).TickLabels.Font.Name = "Arial"
+    chtChart.Axes(xlCategory).TickLabels.Font.FontStyle = "Standaard"
+    chtChart.Axes(xlCategory).TickLabels.Font.Size = 10
+        
+    'CategorieAs Stippellijn en dikte
+    chtChart.Axes(xlCategory).Border.LineStyle = xlDot
+    chtChart.Axes(xlCategory).Border.Weight = xlMedium
+    
+    'CategorieAs Aanpassen tussenspatie
+    If intchart_type <> xlXYScatter Then
+        If Dticks Then
+            chtChart.Axes(xlCategory).TickLabelSpacing = Dticks
+            chtChart.Axes(xlCategory).TickMarkSpacing = Dticks
+        End If
+        chtChart.Axes(xlCategory).MajorTickMark = xlOutside
+        chtChart.Axes(xlCategory).MinorTickMark = xlNone
+        chtChart.Axes(xlCategory).TickLabelPosition = xlLow
+        chtChart.Axes(xlCategory).TickLabels.NumberFormatLinked = True
+        If Dticks > 1000 Then
+            chtChart.Axes(xlCategory).TickLabels.Numberformat = "d/mm/yy hh:mm"
+        Else
+            chtChart.Axes(xlCategory).TickLabels.Numberformat = "d.mm"
+        End If
+        chtChart.Axes(xlCategory).TickLabels.AutoScaleFont = False
+        End If
+    
+    'Primaire As lettertype
+    With chtChart.Axes(xlValue, xlPrimary).TickLabels
+        .AutoScaleFont = True
+        .Font.Name = "Arial"
+        .Font.FontStyle = "Standaard"
+        .Font.Size = 10
+        If NumFormat = "" Then NumFormat = "0.0"
+        .Numberformat = NumFormat
+        End With
+       
+    'gridlines aanpassen
+    chtChart.Axes(xlValue).MajorGridlines.Border.LineStyle = xlDot
+    chtChart.Axes(xlValue).MajorGridlines.Border.Weight = xlHairline
+        
+    'Legende bovenaan plaatsen
+    chtChart.Legend.Position = xlLegendPositionTop
+        
+    'Legende Lettertype
+    chtChart.Legend.AutoScaleFont = True
+    chtChart.Legend.Font.Name = "Arial"
+    chtChart.Legend.Font.FontStyle = "Vet"
+    chtChart.Legend.Font.Size = 10
+    
+    'Schalen aanpassen aan min en max
+    If Minimum = "" Then chtChart.Axes(xlValue, xlPrimary).MinimumScaleIsAuto = True Else chtChart.Axes(xlValue, xlPrimary).MinimumScale = Minimum
+    If Maximum = "" Then chtChart.Axes(xlValue, xlPrimary).MaximumScaleIsAuto = True Else chtChart.Axes(xlValue, xlPrimary).MaximumScale = Maximum
+                 
+    'DELETE Default Series
+    For Each ChtSeries In chtChart.SeriesCollection
+        ChtSeries.Delete
+    Next
+    
+    'ADD New Series
+    Sht = D_Name & "!"
+    For XX = 1 To UBound(kol)
+        chtChart.SeriesCollection.NewSeries
+        chtChart.SeriesCollection(XX).Name = Sht & XVal(XX, 1)
+        chtChart.SeriesCollection(XX).XValues = Sht & XVal(0, 0)
+        chtChart.SeriesCollection(XX).Values = Sht & XVal(XX, 2)
+        chtChart.SeriesCollection(XX).AxisGroup = XVal(XX, 3)
+    Next
+    
+    'FORMAT each Series
+    XX = 1
+    For Each ChtSeries In chtChart.SeriesCollection
+        ChtSeries.Name = DATAsht.Range(XVal(XX, 1))
+        ChtSeries.XValues = DATAsht.Range(CatAs)
+        ChtSeries.Values = DATAsht.Range(XVal(XX, 2))
+        ChtSeries.AxisGroup = XVal(XX, 3)
+        
+        Select Case XVal(XX, 3)   'primaire of secundaire as
+                
+        Case 1          'AxisGroup1 Primaire As
+        Select Case intchart_type
+            Case xlLine
+            Lk = MFuncties.LijnKleur(Lk)
+            ChtSeries.Border.ColorIndex = Lk
+            ChtSeries.Smooth = True
+            ChtSeries.Border.Weight = xlThin
+                
+            Case xlColumnClustered
+            OVk = MFuncties.OpVulKleur(OVk)
+            ChtSeries.Border.ColorIndex = 1         'Zwart
+            ChtSeries.Border.Weight = xlThin
+            ChtSeries.Interior.ColorIndex = OVk
+            End Select
+                     
+        Case 2          'AxisGroup2 Secundaire As
+        
+        Select Case intchart_type
+            Case xlLine
+            Lk = MFuncties.LijnKleur(Lk)
+            ChtSeries.Border.ColorIndex = Lk
+            ChtSeries.Smooth = True
+            ChtSeries.Border.Weight = xlMedium
+            ChtSeries.MarkerStyle = xlNone
+                    
+            Case xlColumnClustered
+            Lk = MFuncties.LijnKleur(Lk)
+            ChtSeries.Border.ColorIndex = Lk
+            ChtSeries.Interior.ColorIndex = xlNone
+            ChtSeries.Border.Weight = xlThick
+                            
+               
+         'Secundaire As lettertype
+            With chtChart.Axes(xlValue, xlSecondary).TickLabels
+            
+                .AutoScaleFont = True
+                .Font.Name = "Arial Black"
+                .Font.Size = 10
+                .Font.FontStyle = "Vet"
+                '.Font.Bold = msoTrue
+                If NumFormat = "" Then NumFormat = "0.0"
+                .Numberformat = NumFormat
+                If D_Name = "ICOS_LI8100" Then
+                    .MinimumScale.Value = 1
+                    .MaximumScale.Value = 120
+                End If
+            End With
+            End Select
+        End Select
+        
+        
+               
+        'Trendlijn toevoegen
+        If intchart_type = xlXYScatter Then
+           ActiveChart.SeriesCollection(1).Trendlines.Add Type:=xlLinear
+           ', Forward:=0, Backward:=0, DisplayEquation:=True, DisplayRSquared:=True
+           End If
+               
+        ChtSeries.Shadow = False
+                            
+        XX = XX + 1
+    Next
+           
+     'Achtergrond bepalen
+    chtChart.PlotArea.Interior.ColorIndex = 24
+    chtChart.SizeWithWindow = True
+    
+    'button plaatsen om grafieken te scheiden of niet
+    If UCase(Separated) <> "FALSE" Then
+        'chtChart.Buttons.Add(10, 6, 50, 25).Select
+        chtChart.Buttons.Add(1, 1, 75, 25).Select
+        With Selection
+            .OnAction = "Splits_Button"
+            .Characters.Text = Separated
+            .AutoScaleFont = True
+        End With
+        If ActiveChart.Axes.Count = 3 Then
+            'M_2_GraphActions.Rescale
+            Rescale
+        End If
+    End If
+    MKolom.FixSourceDataInSheet 'nodig om gaps te genereren i.p.v #N/A door middel van datamanipulatie in gegevens
+End Sub

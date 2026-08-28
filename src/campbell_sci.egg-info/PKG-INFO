@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: campbell-sci
+Version: 0.1.0
+Summary: Starter package for Campbell Sci datalogger file processing
+Requires-Python: >=3.11
+Requires-Dist: pandas>=2.2.0
+Requires-Dist: openpyxl>=3.1.5
+Requires-Dist: matplotlib>=3.8.0
+Requires-Dist: xlwings>=0.30.0

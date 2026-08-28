@@ -1,0 +1,72 @@
+Public Sub Maskeren()
+Worksheets(D_Name).Select
+' Alle '+/-6999' waarden door 'N/A' vervangen.
+    Selection.CurrentRegion.Select
+    Selection.Replace What:="6999", Replacement:="N/A", LookAt:=xlWhole, SearchOrder:=xlByRows
+    Selection.Replace What:="-6999", Replacement:="N/A", LookAt:=xlWhole, SearchOrder:=xlByRows
+    Selection.Replace What:="7999", Replacement:="N/A", LookAt:=xlWhole, SearchOrder:=xlByRows
+    Selection.Replace What:="-7999", Replacement:="N/A", LookAt:=xlWhole, SearchOrder:=xlByRows
+    Selection.Replace What:="NAN", Replacement:="N/A", LookAt:=xlWhole, SearchOrder:=xlByRows
+    Selection.Replace What:="INF", Replacement:="N/A", LookAt:=xlWhole, SearchOrder:=xlByRows
+End Sub
+
+Public Sub Macro_Start(D_Name)
+'Altijd in het begin van de macro plaatsen
+'Om applicatie vlugger te laten gaan
+'Updates en Alerts Verbieden
+ Application.DisplayAlerts = False
+ Application.ScreenUpdating = False
+ 
+ 'Alle *.dat met 'D_Name' benoemen.
+ ActiveSheet.Name = D_Name
+ SetSheetConst (D_Name)
+ CurWBook.Worksheets("Settings").[B5] = D_Name
+ celA1 = UCase(DATAsht.Range("A1"))
+ 
+ Select Case celA1
+ 'indien CR1000, Header deleten (4 bovenste lijnen)
+    Case "TOA5"
+        'Indien recordnummers meegestockeerd zijn verwijderen
+        If DATAsht.Range("B2") = "RECORD" Then MKolom.Verwijderen "B"
+                
+        'Header Bewerken voor titels
+        rows("1").Delete Shift = xltoup
+        rows("2").Delete Shift = xltoup
+        rows("2").Delete Shift = xltoup
+                
+        LastRow = LastRowColumn(Worksheets(D_Name), "R")
+        LastCol = LastRowColumn(Worksheets(D_Name), "C")
+        SetProperty "LastRow", LastRow
+        SetProperty "LastCol", LastCol
+        MCommon.Titels_ZoekEnPlaats
+        'Datum en tijd splitsen
+        MKolom.Numberformat "A", "dd/mm/yy"
+        MKolom.Formule "B", "= A1", "dd/mm/yy hh:mm:ss.0", , -1, 0
+        Range("B1").Value = "UUR"
+        Dticks = MFuncties.DaySticks
+        SetProperty "DTicks", Dticks
+        MKolom.Numberformat "B", "hh:mm:ss.0"
+        'PTemp_Avg veranderen in PTemp omwille van verdere problemen
+        For kol = 1 To LastCol
+            If UCase(Cells(1, kol)) = "PTEMP_AVG" Then Cells(1, kol) = "PTemp"
+        Next
+    Case "LI-8100:"
+           
+    Case "TOA3"
+        
+    Case "1", "2" 'CR10 tabel
+        'Wegens problemen met een onvolledige eerste rij
+        rows("1:1").Delete Shift:=xlUp
+        'LastRow = LastRowColumn(Worksheets(D_Name), "R")
+        'Eerste kolom met 'Tabelnummer' verwijderen.
+        MKolom.Verwijderen ("A")
+        'CR10 datum berekenen
+        MKolom.Formule "B", "=B1 + (A1-1900)*365+roundup((A1-1900)/4,0)", "dd.mm.yy"
+        MKolom.Verwijderen "A"
+        'CR10 tijd berekenen
+        MKolom.Formule "B", "=TIME(TRUNC(B1/100),RIGHT(B1,2),0)", "hh:mm"
+    Case Else
+    
+    End Select
+    MTransfert.CopySheet Applic, "Settings", F_Name
+End Sub

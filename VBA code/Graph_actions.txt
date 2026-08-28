@@ -1,0 +1,514 @@
+Public Sub Scrollen()
+'Purpose: Scroll the chart left or right when zoomed
+'Author: Eddy Smesman
+Application.ScreenUpdating = False
+ctype = ActiveChart.SeriesCollection(1).ChartType
+'Alleen scrollen als er gezoomd is en het over een lijngrafiek gaat
+If (Zoomfactor > 0) And (ctype = xlLine) Then
+    GetProperty "x", x
+    GetProperty "Stap", stap
+    GetProperty "Span", Span
+    GetProperty "LastRow", LastRow
+
+    'Bepalen naar links of rechts scrollen
+    With ActiveChart.PlotArea
+        'RGrens = .InsideWidth
+        'LGrens = .InsideLeft * 2
+        MGrens = .Width * 0.8
+    End With
+    
+    GetProperty "Start", Start
+    GetProperty "Einde", Einde
+      
+    Select Case x
+    'Naar links scrollen
+    'Case Is < LGrens
+    Case Is < MGrens
+        If Start - stap < 2 Then
+            EndTimer
+            Answ = MsgBox("Can't Scroll More to Left")
+            Exit Sub
+        Else
+            Start = Start - stap
+            Einde = Einde - stap
+        End If
+    
+    'Naar Rechts scrollen
+    'Case Is > RGrens
+    Case Is > MGrens
+        If Einde + stap > LastRow Then
+        EndTimer
+            Answ = MsgBox("Can't Scroll More to Right")
+            Exit Sub
+        Else
+            Start = Start + stap
+            Einde = Einde + stap
+        End If
+    End Select
+    SetProperty "Start", Start
+    SetProperty "Einde", Einde
+    ChangeChartRange
+    Rescale
+End If
+Application.ScreenUpdating = True
+End Sub
+Public Sub ZoomIn()
+Application.ScreenUpdating = False
+ctype = ActiveChart.SeriesCollection(1).ChartType
+If ctype = xlLine Then
+    GetChartP
+    GetProperty "LastRow", LastRow
+    'Debug.Print "Lastrow =" & LastRow
+    'Debug.Print "ZoomIn begin   Start = " & Start, "Einde = " & Arg2 + Start - 2
+    SP = Int((Einde - Start) / 10)
+    'Debug.Print "SP = " & SP
+    Answer = InputBox("Geef het aantal metingen in?", , SP)
+    If Answer = vbNullString Then
+        Exit Sub
+    Else
+        Span = Answer
+    End If
+    Zoomfactor = Zoomfactor + 1
+    SetProperty "ZoomFactor", Zoomfactor
+    stap = Int(Span / 100) + 1
+    If Zoomfactor > 0 Then Start = Arg2 - Int(Span / 2)
+    If Start < 2 Then Start = 2
+    Einde = Start + Span
+    If Einde > LastRow Then
+        Einde = LastRow
+        Start = LastRow - Span
+    End If
+    'Onthouden Global variabelen
+    SetProperty "Start", Start
+    SetProperty "Einde", Einde
+    SetProperty "Stap", stap
+    SetProperty "ZoomFactor", Zoomfactor
+    'SetProperty "Arg2", Arg2
+    'Debug.Print "ZoomIn Einde   Start = " & Start, "Einde = " & Einde
+
+    ChangeChartRange
+End If
+Application.ScreenUpdating = True
+End Sub
+
+Public Sub ZoomBack()
+    Application.ScreenUpdating = False
+    Zoomfactor = 0
+    SetProperty "ZoomFactor", Zoomfactor
+    GetProperty "LastRow", LastRow
+    Start = 2
+    Einde = LastRow
+    SetProperty "Start", Start
+    SetProperty "Einde", Einde
+    ChangeChartRange
+    Application.ScreenUpdating = True
+End Sub
+
+Public Sub ZoomMove()
+ctype = ActiveChart.SeriesCollection(1).ChartType
+If ctype = xlLine Then
+    Application.ScreenUpdating = False
+    GetChartP
+    DArg2 = Arg2 - Span
+    BasisPunt = BasisPunt - (-DArg2)
+    Start = BasisPunt
+    If Start < 2 Then Start = 2
+    Einde = Start + (2 * Span)
+    If Einde > LastRow Then Einde = LastRow
+    SetProperty "Start", Start
+    SetProperty "Einde", Einde
+    ChangeChartRange
+    Application.ScreenUpdating = True
+End If
+End Sub
+
+Public Sub ClearBadCuv(cuvette)
+    Dim wksData As Worksheet
+    Dim lngLastRow As Long
+    Dim rngData As Range
+    
+    'Set references up-front
+    With Worksheets("Settings")
+        F_Name = .[B7]
+        D_Name = .[B5]
+    End With
+    Set wksData = Workbooks(F_Name).Worksheets(D_Name)
+    
+    'Identify the last row and use that info to set up the Range
+    With wksData
+        lngLastRow = .Range("C" & .rows.Count).End(xlUp).Row
+        Set rngData = .Range("C2:C" & lngLastRow)
+    End With
+    
+    'Here is where we use the .AutoFilter method to crush those
+    'Bad Cuvette rows
+    Application.DisplayAlerts = False
+        With rngData
+        
+            'Apply the Autofilter method to Column Port
+            .AutoFilter Field:=1, Criteria1:=cuvette
+            'Delete the visible rows while keeping the header
+            .Offset(1).EntireRow.ClearContents
+        End With
+    Application.DisplayAlerts = True
+    
+    'Turn off the AutoFilter
+    With wksData
+        .AutoFilterMode = False
+        If .FilterMode = True Then
+            .ShowAllData
+        End If
+    End With
+    
+    'Let the user know the rows have been removed
+    'MsgBox "Damn son! Rows removed."
+    
+    'Remove 5 first rows of next cuvette
+    DelFirst5Rows
+    ActiveChart.Refresh
+End Sub
+
+Public Sub DelFirst5Rows()
+    FC = 1
+    FirstCell = "A" & FC
+    D_Name = Worksheets("Settings").[B5]
+    LC = LastRowColumn(Worksheets(D_Name), "R")
+    LastCell = "A" & LC
+    brng = FirstCell & ":" & LastCell
+    With Worksheets(D_Name)
+    Do
+        'zoek laatste niet lege cel
+        Edatx = .Range(FirstCell).End(xlDown).Row
+        If Edatx = LC Then Exit Do
+        'zoek eerste niet lege cel
+        bdelx = .Columns("A").Find(What:="*", after:=.Cells(Edatx + 1, 1), LookIn:=xlValues).Row
+        bdelxr = "A" & bdelx
+        edelx = .Range(bdelxr).Offset(5, 1).Row
+        DRows = bdelx & ":" & edelx
+        .Range(DRows).EntireRow.ClearContents
+        FC = edelx
+        FirstCell = "A" & FC + 1
+    Loop
+    End With
+End Sub
+
+Public Sub ClearCuv()
+    'Cuvette data verwijderen om betere grafieken te verkrijgen
+    cuv = GetPortNum
+    YN = MsgBox("Cuvette " & cuv & " Verwijderen? ", vbYesNo, "Campbell Sci")
+    If YN = vbYes Then ClearBadCuv (cuv)
+End Sub
+
+Public Sub splits_button()
+
+ActiveSheet.Shapes("Button 1").Select
+ArrCaptie = Array("Gesplitst", "Zelfde Nul-As")
+NCaptie = UBound(ArrCaptie)
+Dim captie As String
+
+With Selection
+    captie = .Characters.Text
+    Z = IsInArray(captie, ArrCaptie)
+    Z = Z + 1
+    If Z > NCaptie Then Z = 0
+    capt = ArrCaptie(Z)
+    .Characters.Text = capt
+    .AutoScaleFont = True
+End With
+ActiveChart.ChartArea.Select
+Rescale
+
+End Sub
+
+Public Sub Rescale()
+
+Dim Ldata, Rdata As Range
+Dim D_Name As String
+
+ctype = ActiveChart.SeriesCollection(1).ChartType
+If ctype = xlLine Then
+    Application.DisplayAlerts = False
+
+    DN = Get_DataSheetName_From_Chart
+    ChangeChartRange
+
+    'Get Button Caption if exists
+    On Error Resume Next
+    ActiveSheet.Shapes("Button 1").Select
+    With Selection
+        captie = .Characters.Text
+        If captie = "" Then captie = "None"
+    End With
+    On Error GoTo 0
+    
+    'Get range of Values
+    Dim TheChart As Chart
+    Dim ChtSeries As New ChartSeries
+    Lrng = ""
+    Rrng = ""
+    Set TheChart = ActiveChart
+    AxesN = TheChart.Axes.Count
+    
+    For Each series In ActiveChart.SeriesCollection
+        XX = XX + 1
+        'specify Chart object and series number
+    
+        With ChtSeries
+            .Chart = TheChart
+            .ChartSeries = XX
+            Naam = ActiveChart.SeriesCollection(XX).Name
+            Agrp = ActiveChart.SeriesCollection(XX).AxisGroup
+            Trng = Replace(.Values.Address, "$", "")
+            Select Case Agrp
+                Case xlPrimary
+                    If Lrng <> "" Then Lrng = Lrng & ","
+                    Lrng = Lrng & Trng
+                Case xlSecondary
+                    If Rrng <> "" Then Rrng = Rrng & ","
+                    Rrng = Rrng & Trng
+            End Select
+        End With
+    Next
+
+    'Berekenen en herschalen van de assen
+    Select Case True
+        Case AxesN Like 2, captie Like "None"
+            'Calc min en max primary axis
+            Set Ldata = Sheets(DN).Range(Lrng)
+            Pri_Max = MaxValue(Ldata)
+            Pri_Min = MinValue(Ldata)
+        
+            For Each series In ActiveChart.SeriesCollection
+                ActiveChart.Axes(xlValue, xlPrimary).MinimumScale = Pri_Min
+                ActiveChart.Axes(xlValue, xlPrimary).MaximumScale = Pri_Max
+            Next
+        Case captie Like "Gesplitst"
+            'Primaire as Boven Calc min en max primary axis
+            Set Ldata = Sheets(DN).Range(Lrng)
+            Pri_Max = MaxValue(Ldata)
+            Pri_Min = MinValue(Ldata)
+            Pri_Span = Pri_Max - Pri_Min
+            Pri_Min = Pri_Min - Pri_Span
+        
+            'Secundaire as Onder Calc min en max primary axis
+            Set Rdata = Sheets(DN).Range(Rrng)
+            Sec_Max = MaxValue(Rdata)
+            Sec_Min = MinValue(Rdata)
+            Sec_Span = Sec_Max - Sec_Min
+            Sec_Max = Sec_Max + Sec_Span
+        
+            For Each series In ActiveChart.SeriesCollection
+                'Upper Chart
+                ActiveChart.Axes(xlValue, xlPrimary).MinimumScale = Pri_Min
+                ActiveChart.Axes(xlValue, xlPrimary).MaximumScale = Pri_Max
+        
+                'Lower Chart
+                ActiveChart.Axes(xlValue, xlSecondary).MaximumScale = Sec_Max
+                ActiveChart.Axes(xlValue, xlSecondary).MinimumScale = Sec_Min
+            Next
+    
+        Case captie Like "Zelfde Nul-As"
+            'Primaire as
+            Set Ldata = Sheets(DN).Range(Lrng)
+        
+            'Secundaire as
+            Set Rdata = Sheets(DN).Range(Rrng)
+        
+            'Alle assen
+            aRng = Lrng & "," & Rrng
+               
+            Set Alldata = Sheets(DN).Range(aRng)
+            All_Max = MaxValue(Alldata)
+            All_Min = MinValue(Alldata)
+        
+            For Each series In ActiveChart.SeriesCollection
+                ActiveChart.Axes(xlValue, xlPrimary).MinimumScale = All_Min
+                ActiveChart.Axes(xlValue, xlPrimary).MaximumScale = All_Max
+                ActiveChart.Axes(xlValue, xlSecondary).MinimumScale = All_Min
+                ActiveChart.Axes(xlValue, xlSecondary).MaximumScale = All_Max
+            Next
+        
+        Case DN Like "ICOS_LI8100"
+            RMin = 1
+            RMax = 120
+    End Select
+    ActiveChart.ChartArea.Select
+End If
+End Sub
+
+
+Sub AdjustVerticalAxis()
+'PURPOSE: Adjust Y-Axis according to Min/Max of Chart Data of chart sheet
+'SOURCE: www.TheSpreadsheetGuru.com
+'Adapted: Eddy Smesman
+
+Dim MySrs As New ChartSeries
+Dim FirstTime  As Boolean
+Dim MaxNumber As Double
+Dim MinNumber As Double
+Dim MaxChartNumber As Double
+Dim MinChartNumber As Double
+Dim Padding As Double
+
+'Hide Button if exists
+On Error Resume Next
+ActiveSheet.Shapes("Button 1").Visible = False
+On Error GoTo 0
+
+'Input Padding on Top of Min/Max Numbers (Percentage)
+  Padding = 0.1  'Number between 0-1
+
+'First time looking at this chart?
+  FirstTime = True
+
+'Optimize Code
+  Application.ScreenUpdating = False
+  
+With MySrs
+    .Chart = ActiveChart
+    ctype = .Chart.ChartType
+    If ctype = xlLine Then
+    'Determine Chart's Overall Max/Min From Connected Data Source
+      For Each srs In .Chart.SeriesCollection
+        'Determine Maximum value in Series
+          MaxNumber = Application.WorksheetFunction.Max(srs.Values)
+        
+        'Store value if currently the overall Maximum Value
+          If FirstTime = True Then
+            MaxChartNumber = MaxNumber
+          ElseIf MaxNumber > MaxChartNumber Then
+            MaxChartNumber = MaxNumber
+          End If
+        
+        'Determine Minimum value in Series (exclude zeroes)
+          MinNumber = Application.WorksheetFunction.Min(srs.Values)
+          
+        'Store value if currently the overall Minimum Value
+          If FirstTime = True Then
+            MinChartNumber = MinNumber
+          ElseIf MinNumber < MinChartNumber Or MinChartNumber = 0 Then
+            MinChartNumber = MinNumber
+          End If
+        
+        'First Time Looking at This Chart?
+          FirstTime = False
+      Next srs
+   
+    'Rescale Y-Axis
+      .Chart.Axes(xlValue).MinimumScale = MinChartNumber * (1 - Padding)
+      .Chart.Axes(xlValue).MaximumScale = MaxChartNumber * (1 + Padding)
+    End If
+ End With
+ ActiveChart.ChartArea.Select
+'Optimize Code
+
+Application.ScreenUpdating = True
+
+End Sub
+
+Sub AdjustVerticalAxis_chartobjects()
+'PURPOSE: Adjust Y-Axis according to Min/Max of Chart Data in all embedded charts
+'SOURCE: www.TheSpreadsheetGuru.com
+
+Dim cht As ChartObject
+Dim srs As series
+Dim FirstTime  As Boolean
+Dim MaxNumber As Double
+Dim MinNumber As Double
+Dim MaxChartNumber As Double
+Dim MinChartNumber As Double
+Dim Padding As Double
+
+'Input Padding on Top of Min/Max Numbers (Percentage)
+  Padding = 0.1  'Number between 0-1
+
+'Optimize Code
+  Application.ScreenUpdating = False
+  
+'Loop Through Each Chart On ActiveSheet
+  For Each cht In ActiveSheet.ChartObjects
+    
+    'First Time Looking at This Chart?
+    FirstTime = True
+      
+    'Determine Chart's Overall Max/Min From Connected Data Source
+      For Each srs In cht.Chart.SeriesCollection
+        'Determine Maximum value in Series
+          MaxNumber = Application.WorksheetFunction.Max(srs.Values)
+        
+        'Store value if currently the overall Maximum Value
+          If FirstTime = True Then
+            MaxChartNumber = MaxNumber
+          ElseIf MaxNumber > MaxChartNumber Then
+            MaxChartNumber = MaxNumber
+          End If
+        
+        'Determine Minimum value in Series (exclude zeroes)
+          MinNumber = Application.WorksheetFunction.Min(srs.Values)
+          
+        'Store value if currently the overall Minimum Value
+          If FirstTime = True Then
+            MinChartNumber = MinNumber
+          ElseIf MinNumber < MinChartNumber Or MinChartNumber = 0 Then
+            MinChartNumber = MinNumber
+          End If
+        
+        'First Time Looking at This Chart?
+        FirstTime = False
+     Next srs
+      
+    'Rescale Y-Axis
+      cht.Chart.Axes(xlValue).MinimumScale = MinChartNumber * (1 - Padding)
+      cht.Chart.Axes(xlValue).MaximumScale = MaxChartNumber * (1 + Padding)
+  
+  Next cht
+
+'Optimize Code
+  Application.ScreenUpdating = True
+
+End Sub
+
+Public Sub ChangeChartRange()
+'PURPOSE: Change the DataRange of the chart needed to zoom
+'Author: Eddy Smesman
+Dim MySrs As New ChartSeries
+
+    With MySrs
+        .Chart = ActiveChart
+        .ChartSeries = 1
+        
+        GetProperty "Start", Start
+        GetProperty "Einde", Einde
+        GetProperty "LastRow", LastRow
+        
+        If Start = 0 Then Start = 2
+        If (Einde > LastRow) Or (Einde = 0) Then Einde = LastRow
+    
+        N = .Chart.SeriesCollection.Count
+        For XX = 1 To N
+            SeriesFormula = .Chart.SeriesCollection(XX).Formula
+            
+            sf = Split(SeriesFormula, ",")
+            XRngOud = sf(1)
+            YRngOud = sf(2)
+            RngOud = XRngOud & "," & YRngOud
+            
+            XRngArr = Split(XRngOud, "$")
+            XRngArr(2) = Start & ":"
+            XRngArr(4) = Einde
+            XRngNew = Join(XRngArr, "$")
+            
+            YRngArr = Split(YRngOud, "$")
+            YRngArr(2) = Start & ":"
+            YRngArr(4) = Einde
+            YRngNew = Join(YRngArr, "$")
+            RngNew = XRngNew & "," & YRngNew
+            
+            Nformula = WorksheetFunction.Substitute(.Chart.SeriesCollection(XX).Formula, RngOud, RngNew)
+            .Chart.SeriesCollection(XX).Formula = Nformula
+        Next
+        .Chart.Select
+        .Chart.Refresh
+    End With
+    
+End Sub
