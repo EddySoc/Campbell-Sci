@@ -62,6 +62,26 @@ CHART_TYPES = {"line": LineChart, "column": BarChart, "scatter": ScatterChart}
 CONFIG_DIR = Path(__file__).with_name("graph_configs")
 _CELL_RANGE_RE = re.compile(r"(\$?[A-Z]+\$?)\d+(?::(\$?[A-Z]+\$?))?\d+$")
 
+# Leesbare tabkleurnamen toegestaan in .logdef naast rechtstreekse hex-codes.
+TAB_COLOR_NAMES = {
+    "red": "FF0000",
+    "blue": "0000FF",
+    "yellow": "FFFF00",
+    "cyan": "00FFFF",
+    "green": "00FF00",
+    "magenta": "FF00FF",
+    "orange": "FFA500",
+    "purple": "800080",
+    "black": "000000",
+    "white": "FFFFFF",
+    "gray": "808080",
+    "grey": "808080",
+}
+
+
+def _resolve_tab_color(value: str) -> str:
+    return TAB_COLOR_NAMES.get(value.strip().lower(), value)
+
 
 def _next_color(palette: Sequence[str], index: int) -> str:
     return palette[index % len(palette)]
@@ -192,7 +212,11 @@ def rescale_chart(workbook: Workbook, chart_name: str, mode: str = "auto", paddi
 
 
 def load_chart_config(logger_name: str, config_dir: str | Path = CONFIG_DIR) -> list[dict]:
-    """Read one chart definition per line from a logger .logdef file."""
+    """Read chart and optional windrose definitions from a logger .logdef file.
+
+    A windrose uses ``windroos`` as type and one direction-column header in
+    ``columns``. Its name becomes the output worksheet name.
+    """
     path = Path(config_dir) / f"{logger_name.upper()}.logdef"
     if not path.is_file():
         return []
@@ -212,7 +236,7 @@ def load_chart_config(logger_name: str, config_dir: str | Path = CONFIG_DIR) -> 
             "minimum": float(minimum) if minimum else None,
             "maximum": float(maximum) if maximum else None,
             "num_format": num_format or "0.0",
-            "tab_color": tab_color or None,
+            "tab_color": _resolve_tab_color(tab_color) if tab_color else None,
         })
     return charts
 
@@ -232,10 +256,21 @@ def _columns_from_headers(ws, column_spec: str) -> str:
 
 
 def build_configured_charts(workbook: Workbook, logger_name: str, data_sheet: str = "Data", first_data_row: int = 2, config_dir: str | Path = CONFIG_DIR) -> int:
-    """Build all charts declared in the logger's text configuration."""
+    """Build all charts and optional windrose declared in the logger configuration."""
     ws = workbook[data_sheet]
     count = 0
     for chart in load_chart_config(logger_name, config_dir):
+        if chart["chart_type"] == "windroos":
+            from campbell_sci.windroos import add_wind_rose_to_workbook
+
+            add_wind_rose_to_workbook(
+                workbook,
+                column=chart["columns"],
+                source_sheet=data_sheet,
+                output_sheet=chart["chart_name"],
+            )
+            count += 1
+            continue
         chart["columns"] = _columns_from_headers(ws, chart["columns"])
         build_chart_sheet(workbook, data_sheet=data_sheet, first_data_row=first_data_row, **chart)
         count += 1
@@ -406,7 +441,7 @@ def build_chart_sheet(
             fill_i += 1
         elif chart_type != "scatter":  # Don't smooth scatter charts
             series.graphicalProperties.line.solidFill = _next_color(LINE_COLORS, line_i)
-            series.graphicalProperties.line.width = 20000 if is_primary else 28000
+            series.graphicalProperties.line.width = 12700 if is_primary else 28000
             series.smooth = True
             line_i += 1
         else:  # scatter chart
@@ -448,8 +483,11 @@ def build_chart_sheet(
         if not is_scatter:
             secondary.set_categories(categories)
         secondary.y_axis.axId = 200
+        secondary.y_axis.axPos = "r"
         _style_value_axis(secondary, num_format, None, None, dotted_gridlines=False, show_category_axis=False)
-        primary.y_axis.crosses = "min"
+        # Primaire as laten kruisen bij "max" i.p.v. "min" is nodig zodat Excel
+        # de secundaire as effectief rechts tekent i.p.v. beide links.
+        primary.y_axis.crosses = "max"
         primary += secondary
 
     # Vervang een bestaand grafiekblad met dezelfde naam.

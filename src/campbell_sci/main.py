@@ -31,6 +31,14 @@ def _delete_quietly(path: str | Path) -> None:
         pass
 
 
+def _get_excel_application():
+    """Reuse a running Excel instance, including the VSTO instance started by Visual Studio."""
+    try:
+        return win32com.client.GetActiveObject("Excel.Application"), False
+    except Exception:
+        return win32com.client.Dispatch("Excel.Application"), True
+
+
 def open_generated_file(path: str | Path):
     """Show the workbook in Excel, then delete it once the user closes it.
 
@@ -40,29 +48,37 @@ def open_generated_file(path: str | Path):
     path_str = str(path)
     try:
         if win32com is not None:
-            excel = win32com.client.DispatchEx("Excel.Application")
+            excel, started_by_campbell = _get_excel_application()
             excel.Visible = True
             excel.DisplayAlerts = False
             workbook = excel.Workbooks.Open(path_str)
+            excel.WindowState = -4137  # xlMaximized
+            excel.DisplayFullScreen = False
+            workbook.Activate()
             print(f"Excel geopend: {path_str}")
 
             # Block until the user closes the workbook (or Excel itself).
-            while True:
-                time.sleep(1)
-                try:
-                    workbook.Name  # raises once the workbook is closed
-                except Exception:
-                    break
-
             try:
-                excel.Quit()
-            except Exception:
-                pass
+                while True:
+                    time.sleep(1)
+                    try:
+                        workbook.Name  # raises once the workbook is closed
+                    except Exception:
+                        break
+            except KeyboardInterrupt:
+                print("Wachten op Excel onderbroken; Excel en de werkmap blijven geopend.")
+                return
+
+            if started_by_campbell:
+                try:
+                    excel.Quit()
+                except Exception:
+                    pass
 
             _delete_quietly(path)
             return
-    except Exception:
-        pass
+    except Exception as exc:
+        print(f"Excel COM-opening mislukt; standaardopening wordt gebruikt: {exc}")
 
     try:
         os.startfile(path_str)
@@ -159,9 +175,8 @@ def create_workbook_for_file(df, file_name: str, label: str):
 
 
 def process_bm(df, file_name: str):
-    """Python-versie van `MDataLogger.METEO`: gecombineerde grafieken + windroos."""
+    """Python-versie van `MDataLogger.METEO`: grafieken uit de BM-configuratie."""
     from campbell_sci.logger_routines import add_leaf_temperature, mask_bad_values
-    from campbell_sci.windroos import add_wind_rose_to_workbook
 
     df = mask_bad_values(df)
     df = add_leaf_temperature(df)
@@ -172,7 +187,6 @@ def process_bm(df, file_name: str):
     first_data_row = _first_measurement_row_index(df) + 2
 
     build_configured_charts(wb, "BM", data_sheet.title, first_data_row=first_data_row)
-    add_wind_rose_to_workbook(wb, column="Wind_Dir_WVT", source_sheet=data_sheet.title)
 
     wb.save(output_path)
     print(f"Werkmap opgeslagen: {output_path}")

@@ -24,4 +24,4 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-campbell_sci = ["graph_configs/*.logdef"]
+campbell_sci = ["graph_configs/*.logdef", "menu_configs/*.menu"]
