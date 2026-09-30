@@ -1,6 +1,6 @@
 # name;type;columns;minimum;maximum;number format;tab color
 # type=windroos uses one direction-column header in columns; omit the line for loggers without a windrose.
-# tab color: hex code (e.g. 00FFFF) or a name (red, blue, yellow, cyan, green, magenta, orange, purple, black, white, gray)
+# tab color: hex code or a readable color name
 Wind F.;windroos;Wind_Dir_WVT;;;;cyan
 Wind;line;TIMESTAMP,Wind_24_m_Avg,Wind_32_m_Avg,Wind_40_m,Wind_40_m_TMx@secondary;;;0.0;cyan
 Wind 40 m;line;TIMESTAMP,Wind_40_m_old_Avg,Wind_40_m;;;0.0;cyan
@@ -10,8 +10,8 @@ Luchtdruk;line;TIMESTAMP,Barometer_Avg;;;0.0;red
 Droge T;line;TIMESTAMP,Temp_02_m_Avg,Temp_24_m_Avg,Temp_40_m_Avg,Leaf T.@secondary;;;0.0;red
 Bodem T;line;TIMESTAMP,S_Temp_1_Avg,S_Temp_2_Avg,H_Flux_1_Avg@secondary,H_Flux_2_Avg@secondary,Net_Rad_Avg@secondary;;;0.0;red
 Cabine T;line;TIMESTAMP,Temp_Cab_Avg;;;0.0;red
-Neerslag;line;TIMESTAMP,lfWet_(1)@secondary,T_Fall_2_Tot,Precipit_Tot,ETo;;;0.0;blue
-Bladnat;line;TIMESTAMP,lfWet_(1)@secondary,Wet_Gr_SW_Hst,Sun_Hours_Tot;;;0.0;blue
+Neerslag;line;TIMESTAMP,lfWet(1)@secondary,T_Fall_2_Tot,Precipit_Tot,ETo;;;0.0;blue
+Bladnat;line;TIMESTAMP,lfWet(1)@secondary,Wet_Gr_SW_Hst,Sun_Hours_Tot;;;0.0;blue
 RV;line;TIMESTAMP,R_H_02_m_Avg,R_H_24_m_Avg,R_H_40_m_Avg;;;0.0;blue
 GWT;line;TIMESTAMP,H20_Depth_Avg,Net_Rad_Avg@secondary;;;0.0;blue
 Straling;line;TIMESTAMP,Solar_Rad_Avg,Solar_R_I_Avg,Net_Rad_Avg@secondary,Total_Net_Avg@secondary;;;0.0;yellow

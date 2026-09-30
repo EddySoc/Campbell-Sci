@@ -1,5 +1,3 @@
-debug*.py
-test*.py
 *.dat
 __pycache__/
 *.pyc
