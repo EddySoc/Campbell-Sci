@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "campbell-sci-new"
+version = "0.1.0"
+description = "Interactive Campbell Sci data and graph viewer"
+requires-python = ">=3.11"
+dependencies = [
+  "pandas>=2.2.0",
+  "matplotlib>=3.8.0",
+]
+
+[project.scripts]
+campbell-sci-new = "campbell_sci_new.main:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+campbell_sci_new = ["graph_configs/*.logdef", "graph_configs/*.menudef"]
