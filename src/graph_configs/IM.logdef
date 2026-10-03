@@ -1,0 +1,9 @@
+# name;type;columns;minimum;maximum;number format;tab color
+# type=windroos uses one direction-column header in columns; omit the line for loggers without a windrose.
+# tab color: hex code or a readable color name
+Batterij;line;TIMESTAMP,batt_volt_Min;;;0.0;gray
+Temp;line;TIMESTAMP,PTemp_Avg;;;0.0;
+O3;line;TIMESTAMP,AVG_O3,STD_O3@secondary;;;0.0;
+NOx Avg;line;TIMESTAMP,AVG_NO,AVG_NO2,Hoogte;;;0.0;
+Nox Std;line;TIMESTAMP,STD_NO,STD_NO2,Hoogte;;;0.0;
+Vgl O3 Nox;line;TIMESTAMP,AVG_NO,AVG_NO2,STD_O3@secondary;;;0.0;

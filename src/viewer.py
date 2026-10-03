@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 import pandas as pd
-from settings import get_last_dir, set_last_dir
+from settings import get_auto_scale_y, get_last_dir, set_auto_scale_y, set_last_dir
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
@@ -173,6 +173,7 @@ class CampbellViewer:
         self.source = source
         self.logger = logger
         self.page = 0
+        self._data_changed = False
         self.figures: list[Figure] = []
         self.canvases: list[FigureCanvasTkAgg] = []
         self.chart_axes: list[tuple[FigureCanvasTkAgg, list[Any], bool]] = []
@@ -180,6 +181,8 @@ class CampbellViewer:
         self._configure_window()
         self._build_shell()
         self._populate_tabs()
+        self._last_selected_tab = self.notebook.select()
+        self.notebook.bind("<<NotebookTabChanged>>", self._on_notebook_tab_changed)
 
     def _configure_window(self) -> None:
         self.root.title(f"Campbell Sci | {self.source.name}")
@@ -202,6 +205,12 @@ class CampbellViewer:
         toolbar = ttk.Frame(self.root, style="Toolbar.TFrame", padding=(14, 10))
         toolbar.pack(fill="x")
         ttk.Button(toolbar, text="Open .dat", command=self._choose_another_file).pack(side="left")
+        ttk.Button(toolbar, text="Nieuwe .logdef", command=self._open_logdef_editor).pack(side="left", padx=(8, 0))
+        self.auto_scale_y = tk.BooleanVar(value=get_auto_scale_y())
+        ttk.Checkbutton(
+            toolbar, text="Y-as automatisch schalen bij zoomen", variable=self.auto_scale_y,
+            command=self._on_auto_scale_toggle,
+        ).pack(side="left", padx=(14, 0))
         self.file_label = ttk.Label(toolbar, text=self.source.name, style="Toolbar.TLabel")
         self.file_label.pack(side="left", padx=(14, 0))
         self.status = tk.StringVar(value=f"{len(self.data):,} rijen | logger {self.logger}")
@@ -227,10 +236,12 @@ class CampbellViewer:
             if name in used_names:
                 name = f"{name[:26]} ({index + 1})"
             used_names.add(name)
+            chart_spec = dict(spec)
+            chart_spec["name"] = name
             page = ttk.Frame(self.notebook)
             self.notebook.add(page, text=name)
             try:
-                self._draw_chart(page, spec, headers)
+                self._draw_chart(page, chart_spec, headers, self.data)
             except (KeyError, ValueError) as exc:
                 ttk.Label(page, text=f"Grafiek kan niet worden opgebouwd: {exc}", padding=24).pack(anchor="w")
         if len(self.notebook.tabs()) > 1:
@@ -244,6 +255,24 @@ class CampbellViewer:
         self.figures.clear()
         self.canvases.clear()
         self.chart_axes.clear()
+
+    def _on_notebook_tab_changed(self, _event: tk.Event) -> None:
+        selected_tab = self.notebook.select()
+        if not selected_tab:
+            return
+        previous_tab = self._last_selected_tab
+        self._last_selected_tab = selected_tab
+        tabs = self.notebook.tabs()
+        if len(tabs) < 2 or previous_tab != tabs[0] or selected_tab == tabs[0]:
+            return
+
+        self._finish_cell_edit(save=True)
+        if not self._data_changed:
+            return
+        for canvas, axes_list, _is_wind_rose in self.chart_axes:
+            self._restore_chart(canvas, axes_list)
+            canvas.draw_idle()
+        self._data_changed = False
 
     def _add_data_tab(self) -> None:
         page = ttk.Frame(self.notebook, padding=10)
@@ -353,6 +382,7 @@ class CampbellViewer:
             except ValueError:
                 pass
         self.data.iloc[row_position, column_index] = value
+        self._data_changed = True
         display = "" if pd.isna(value) else str(value)
         self.table.set(item, column_id, display)
         self.status.set(f"Cel aangepast: rij {row_position + 1}, kolom {column}")
@@ -446,6 +476,7 @@ class CampbellViewer:
             row_position = self._row_position(item)
             self.data.iloc[row_position, self._marked_column_index] = float("nan")
             self.table.set(item, self._marked_column_id, "")
+        self._data_changed = True
         self.status.set(f"{len(selected_items)} cellen gewist in kolom {column}")
 
 
@@ -468,7 +499,13 @@ class CampbellViewer:
         self.page = max(0, min(total_pages - 1, self.page + direction))
         self._show_page()
 
-    def _draw_chart(self, page: ttk.Frame, spec: dict[str, Any], headers: dict[str, str]) -> None:
+    def _draw_chart(
+        self,
+        page: ttk.Frame,
+        spec: dict[str, Any],
+        headers: dict[str, str],
+        data: pd.DataFrame,
+    ) -> None:
         figure = Figure(figsize=(10, 6), dpi=100, facecolor="#FFFFFF")
         axes = figure.add_subplot(111)
         axes.set_facecolor("#FFFFFF")
@@ -480,15 +517,15 @@ class CampbellViewer:
         chart_type = spec["type"]
 
         if chart_type == "windroos":
-            axes = self._draw_wind_rose(figure, axes, spec, headers)
+            axes = self._draw_wind_rose(figure, axes, spec, headers, data)
             axes_list = [axes]
             is_wind_rose = True
         elif chart_type == "scatter":
-            self._draw_scatter(axes, spec, headers)
+            self._draw_scatter(axes, spec, headers, data)
             axes_list = [axes]
             is_wind_rose = False
         else:
-            axes_list = self._draw_lines(figure, axes, spec, headers)
+            axes_list = self._draw_lines(figure, axes, spec, headers, data)
             is_wind_rose = False
 
         canvas = FigureCanvasTkAgg(figure, master=page)
@@ -716,20 +753,46 @@ class CampbellViewer:
         axes.tick_params(colors="#344454", labelsize=9)
         axes.set_title(spec["name"], loc="left", fontsize=13, fontweight="bold", color="#1F2D3A", pad=14)
         if spec["type"] == "windroos":
-            restored_axes = [self._draw_wind_rose(figure, axes, spec, headers)]
+            restored_axes = [self._draw_wind_rose(figure, axes, spec, headers, self.data)]
         elif spec["type"] == "scatter":
-            self._draw_scatter(axes, spec, headers)
+            self._draw_scatter(axes, spec, headers, self.data)
             restored_axes = [axes]
         else:
-            restored_axes = self._draw_lines(figure, axes, spec, headers)
+            restored_axes = self._draw_lines(figure, axes, spec, headers, self.data)
         axes_list[:] = restored_axes
 
-    def _draw_lines(self, figure: Figure, axes: Any, spec: dict[str, Any], headers: dict[str, str]) -> list[Any]:
+    def _draw_lines(
+        self,
+        figure: Figure,
+        axes: Any,
+        spec: dict[str, Any],
+        headers: dict[str, str],
+        data: pd.DataFrame,
+    ) -> list[Any]:
         columns = spec["columns"]
         if len(columns) < 2:
             raise ValueError("Een lijngrafiek vereist een tijdkolom en minstens een meetkolom.")
         x_column, _ = _resolve_header(headers, columns[0])
-        x_values, is_date = _x_values(self.data[x_column])
+        x_values, is_date = _x_values(data[x_column])
+        height_column: str | None = None
+        height_values: list[Any] = []
+        for configured_column in columns[1:]:
+            try:
+                candidate, _ = _resolve_header(headers, configured_column)
+            except ValueError:
+                continue
+            if candidate.upper() == "HOOGTE":
+                height_column = candidate
+                height_values = (
+                    data.iloc[self.header_row_count:][candidate]
+                    .dropna()
+                    .drop_duplicates()
+                    .tolist()
+                )
+                if not height_values:
+                    raise ValueError("De kolom 'Hoogte' bevat geen waarden om op te splitsen.")
+                break
+
         secondary_axes = None
         legend_handles = []
         missing_columns = []
@@ -740,10 +803,9 @@ class CampbellViewer:
             except ValueError:
                 missing_columns.append(configured_column.removesuffix("@secondary"))
                 continue
-            y_values = pd.to_numeric(self.data[column], errors="coerce")
-            valid = x_values.notna() & y_values.notna()
-            if not valid.any():
+            if column.upper() == "HOOGTE":
                 continue
+            y_values = pd.to_numeric(data[column], errors="coerce")
             target = axes
             if secondary:
                 if secondary_axes is None:
@@ -751,17 +813,39 @@ class CampbellViewer:
                     secondary_axes.spines["top"].set_visible(False)
                     secondary_axes.tick_params(colors="#344454", labelsize=9)
                 target = secondary_axes
-            line, = target.plot(
-                x_values[valid],
-                y_values[valid],
-                color=LINE_COLORS[series_index % len(LINE_COLORS)],
-                linewidth=2.4 if secondary else 0.9,
-                label=column,
-            )
-            line._campbell_row_indices = list(self.data.index[valid])
-            line._campbell_column = column
-            legend_handles.append(line)
-            plotted += 1
+            chart_heights = height_values or [None]
+            for height_index, height_value in enumerate(chart_heights):
+                valid = x_values.notna() & y_values.notna()
+                label = column
+                if height_column is not None and height_value is not None:
+                    matches_height = data[height_column].eq(height_value).fillna(False)
+                    if self.header_row_count:
+                        matches_height.iloc[:self.header_row_count] = False
+                    valid &= matches_height
+                    label = f"{column} (Hoogte {height_value})"
+                if not valid.any():
+                    continue
+                color_index = series_index * len(chart_heights) + height_index
+                color = LINE_COLORS[color_index % len(LINE_COLORS)]
+                if spec["type"] == "bar":
+                    xs = x_values[valid]
+                    step = xs.diff().median()
+                    width = step if pd.notna(step) and step else 1
+                    if is_date:
+                        width = mdates.date2num(xs.iloc[0] + width) - mdates.date2num(xs.iloc[0])
+                    line = target.bar(xs, y_values[valid], width=width * 0.8, color=color, label=label)
+                else:
+                    line, = target.plot(
+                        x_values[valid],
+                        y_values[valid],
+                        color=color,
+                        linewidth=2.4 if secondary else 0.9,
+                        label=label,
+                    )
+                line._campbell_row_indices = list(data.index[valid])
+                line._campbell_column = column
+                legend_handles.append(line)
+                plotted += 1
         if not plotted:
             raise ValueError("De geconfigureerde kolommen bevatten geen plotbare data.")
         axes.set_ylabel("Waarde", color="#344454")
@@ -788,16 +872,22 @@ class CampbellViewer:
         axes.set_xlim(auto=True)
         return [axes] + ([secondary_axes] if secondary_axes is not None else [])
 
-    def _draw_scatter(self, axes: Any, spec: dict[str, Any], headers: dict[str, str]) -> None:
+    def _draw_scatter(
+        self,
+        axes: Any,
+        spec: dict[str, Any],
+        headers: dict[str, str],
+        data: pd.DataFrame,
+    ) -> None:
         if len(spec["columns"]) != 2:
             raise ValueError("Een scattergrafiek vereist exact twee kolommen: Y en X.")
         y_column, _ = _resolve_header(headers, spec["columns"][0])
         x_column, _ = _resolve_header(headers, spec["columns"][1])
-        x_values = pd.to_numeric(self.data[x_column], errors="coerce")
-        y_values = pd.to_numeric(self.data[y_column], errors="coerce")
+        x_values = pd.to_numeric(data[x_column], errors="coerce")
+        y_values = pd.to_numeric(data[y_column], errors="coerce")
         valid = x_values.notna() & y_values.notna()
         points = axes.scatter(x_values[valid], y_values[valid], s=10, alpha=0.55, color=LINE_COLORS[0], edgecolors="none")
-        points._campbell_row_indices = list(self.data.index[valid])
+        points._campbell_row_indices = list(data.index[valid])
         points._campbell_column = y_column
         axes.set_xlabel(x_column)
         axes.set_ylabel(y_column)
@@ -805,11 +895,18 @@ class CampbellViewer:
         if not valid.any():
             raise ValueError("De scatterkolommen bevatten geen numerieke datapunten.")
 
-    def _draw_wind_rose(self, figure: Figure, axes: Any, spec: dict[str, Any], headers: dict[str, str]) -> Any:
+    def _draw_wind_rose(
+        self,
+        figure: Figure,
+        axes: Any,
+        spec: dict[str, Any],
+        headers: dict[str, str],
+        data: pd.DataFrame,
+    ) -> Any:
         if not spec["columns"]:
             raise ValueError("Geen windrichtingskolom opgegeven.")
         column, _ = _resolve_header(headers, spec["columns"][0])
-        directions = pd.to_numeric(self.data[column], errors="coerce").dropna().mod(360)
+        directions = pd.to_numeric(data[column], errors="coerce").dropna().mod(360)
         if directions.empty:
             raise ValueError("Geen numerieke windrichtingen gevonden.")
         bins = 16
@@ -830,6 +927,49 @@ class CampbellViewer:
         polar_axes.set_title(spec["name"], loc="left", fontsize=13, fontweight="bold", color="#1F2D3A", pad=22)
         polar_axes.set_ylabel("Percentage", labelpad=28)
         return polar_axes
+
+    def _on_auto_scale_toggle(self) -> None:
+        enabled = self.auto_scale_y.get()
+        set_auto_scale_y(enabled)
+        for canvas, axes_list, is_wind_rose in self.chart_axes:
+            if is_wind_rose:
+                continue
+            if enabled:
+                self._fit_y_to_view(canvas, axes_list)
+            else:
+                self._reset_y_scale(canvas, axes_list)
+            canvas.draw_idle()
+
+    def _reset_y_scale(self, canvas: FigureCanvasTkAgg, axes_list: list[Any]) -> None:
+        spec = getattr(canvas, "_campbell_chart_spec", {})
+        for index, axes in enumerate(axes_list):
+            axes.relim()
+            axes.set_autoscaley_on(True)
+            axes.autoscale_view(scalex=False, scaley=True)
+            if index == 0 and (spec.get("minimum") is not None or spec.get("maximum") is not None):
+                axes.set_ylim(bottom=spec.get("minimum"), top=spec.get("maximum"))
+
+    def _fit_y_to_view(self, canvas: FigureCanvasTkAgg, axes_list: list[Any]) -> None:
+        spec = getattr(canvas, "_campbell_chart_spec", {})
+        fixed_primary = spec.get("minimum") is not None or spec.get("maximum") is not None
+        for index, axes in enumerate(axes_list):
+            if index == 0 and fixed_primary:
+                continue
+            left, right = axes.get_xlim()
+            low, high = math.inf, -math.inf
+            for line in axes.get_lines():
+                points = line.get_xydata()
+                if not len(points):
+                    continue
+                inside = (points[:, 0] >= left) & (points[:, 0] <= right)
+                values = points[inside, 1]
+                values = values[~(values != values)]
+                if len(values):
+                    low, high = min(low, float(values.min())), max(high, float(values.max()))
+            if not math.isfinite(low):
+                continue
+            margin = (high - low) * 0.05 or abs(high) * 0.05 or 1.0
+            axes.set_ylim(low - margin, high + margin)
 
     def _on_scroll(self, event: Any, canvas: FigureCanvasTkAgg, axes_list: list[Any], is_wind_rose: bool) -> None:
         if is_wind_rose:
@@ -878,7 +1018,13 @@ class CampbellViewer:
             new_right = new_left + span
             for axes in axes_list:
                 axes.set_xlim(new_left, new_right)
+        if self.auto_scale_y.get():
+            self._fit_y_to_view(canvas, axes_list)
         canvas.draw_idle()
+
+    def _open_logdef_editor(self) -> None:
+        from logdef_editor import LogdefEditor
+        LogdefEditor(self.root, [str(c) for c in self.data.columns], self.logger, CONFIG_DIR)
 
     def _choose_another_file(self) -> None:
         selected = filedialog.askopenfilename(
@@ -900,9 +1046,11 @@ class CampbellViewer:
                     infrared = pd.to_numeric(data["IR_R_R_Avg"], errors="coerce")
                     data["Leaf T."] = (infrared / 0.0000000567) ** 0.25 - 273.16
             self.data, self.source, self.logger, self.page = data, source, logger, 0
+            self._data_changed = False
             self.root.title(f"Campbell Sci | {source.name}")
             self.file_label.configure(text=source.name)
             self.status.set(f"{len(data):,} rijen | logger {logger}")
             self._populate_tabs()
+            self._last_selected_tab = self.notebook.select()
         except Exception as exc:
             messagebox.showerror("Campbell Sci", str(exc), parent=self.root)
