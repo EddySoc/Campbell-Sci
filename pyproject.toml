@@ -22,4 +22,9 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-campbell_sci_new = ["graph_configs/*.logdef", "graph_configs/*.menudef"]
+campbell_sci_new = [
+  "Configs/Logdefs/*.logdef",
+  "Configs/Menudefs/*.menudef",
+  "Configs/Helpdefs/*.helpdef",
+  "Meettoren.jpg",
+]

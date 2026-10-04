@@ -1,0 +1,11 @@
+# name;type;columns;minimum;maximum;number format;tab color
+# type=windroos uses one direction-column header in columns; omit the line for loggers without a windrose.
+# tab color: hex code or a readable color name
+Put 1;line;TIMESTAMP,PA_A(1),PA_A(2),PA_A(3),PA_A(4);;;0.0;
+Put 2;line;TIMESTAMP,PA_B(1),PA_B(2),PA_B(3),PA_B(4);;;0.0;
+Put 3;line;TIMESTAMP,PA_C(1),PA_C(2),PA_C(3),PA_C(4);;;0.0;
+Temp;line;TIMESTAMP,ST(1),ST(2),ST(3),ST(4);;;0.0;
+Laag 1;line;TIMESTAMP,PA_A(1),PA_B(1),PA_C(1),ST(1)@secondary;;;0.0;
+Laag 2;line;TIMESTAMP,PA_A(2),PA_B(2),PA_C(2),ST(2)@secondary;;;0.0;
+Laag 3;line;TIMESTAMP,PA_A(3),PA_B(3),PA_C(3),ST(3)@secondary;;;0.0;
+laag 4;line;TIMESTAMP,PA_A(4),PA_B(4),PA_C(4),ST(4)@secondary;;;0.0;

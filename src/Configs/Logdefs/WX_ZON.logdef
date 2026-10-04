@@ -1,0 +1,11 @@
+# name;type;columns;minimum;maximum;number format;tab color
+# type=windroos uses one direction-column header in columns; omit the line for loggers without a windrose.
+# tab color: hex code or a readable color name
+Batterij;line;TIMESTAMP,batt_volt_Min;;;0.0;
+Wind;windroos;WRichting_Avg;;;0.0;
+Windsnelheid;line;TIMESTAMP,WSnelheid_Avg,WSmax_Max@secondary;;;0.0;
+Lucht temp;line;TIMESTAMP,LTemp_Avg;;;0.0;
+R.V.;line;TIMESTAMP,RV_Avg;;;0.0;
+Radiatie;line;TIMESTAMP,Sol_Rad_Avg,Tot_Rad_Tot@secondary;;;0.0;
+Regen Tot.;line;TIMESTAMP,Regen_Tot;;;0.0;
+TB;line;TIMESTAMP,TB_Daily,TB_mm_Tot@secondary;;;0.0;

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -8,17 +7,7 @@ from tkinter import filedialog, messagebox
 import pandas as pd
 
 from settings import get_last_dir, set_last_dir
-from viewer import CampbellViewer, read_dat_file
-
-
-def logger_from_filename(path: Path) -> str:
-    match = re.search(r"(?P<date>\d{4}_\d{2}_\d{2}(?:_\d{2}(?:_\d{2}(?:_\d{2})?)?)?)$", path.stem)
-    if not match:
-        raise ValueError(f"Bestandsnaam voldoet niet aan het patroon: {path.name}")
-    logger = path.stem[:match.start()].rstrip("_")
-    if not logger:
-        raise ValueError(f"Kon geen loggernaam bepalen uit {path.name}")
-    return logger.upper()
+from viewer import CampbellViewer, logger_from_filename, read_dat_file
 
 
 def choose_dat_file(parent: tk.Misc | None = None) -> str:

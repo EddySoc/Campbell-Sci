@@ -27,13 +27,21 @@ def chart_to_line(chart: dict, time_column: str) -> str:
 
 
 class LogdefEditor(tk.Toplevel):
-    def __init__(self, parent: tk.Misc, headers: list[str], logger: str, config_dir: Path):
+    def __init__(
+        self,
+        parent: tk.Misc,
+        headers: list[str],
+        logger: str,
+        config_dir: Path,
+        location: str | None = None,
+    ):
         super().__init__(parent)
         self.title("Nieuwe .logdef maken")
         self.geometry("980x600")
         self.headers = headers
         self.time_column = headers[0] if headers else "TIMESTAMP"
         self.logger = logger
+        self.location = location
         self.config_dir = Path(config_dir)
         self.charts: list[dict] = []
         self.current: int | None = None
@@ -191,9 +199,10 @@ class LogdefEditor(tk.Toplevel):
             self.selected.delete(index)
 
     def _open(self) -> None:
+        config_name = f"{self.logger}_{self.location}" if self.location else self.logger
         path = filedialog.askopenfilename(
             parent=self, title="Open .logdef", initialdir=self.config_dir,
-            initialfile=f"{self.logger}.logdef", filetypes=[("Logdef", "*.logdef")])
+            initialfile=f"{config_name}.logdef", filetypes=[("Logdef", "*.logdef")])
         if not path:
             return
         charts = []
@@ -239,9 +248,10 @@ class LogdefEditor(tk.Toplevel):
         if not charts:
             messagebox.showwarning("Logdef", "Kies kolommen voor minstens één grafiek.", parent=self)
             return
+        config_name = f"{self.logger}_{self.location}" if self.location else self.logger
         path = filedialog.asksaveasfilename(
             parent=self, title="Opslaan als", defaultextension=".logdef", initialdir=self.config_dir,
-            initialfile=f"{self.logger}.logdef", filetypes=[("Logdef", "*.logdef")])
+            initialfile=f"{config_name}.logdef", filetypes=[("Logdef", "*.logdef")])
         if not path:
             return
         lines = [chart_to_line(chart, self.time_column) for chart in charts]

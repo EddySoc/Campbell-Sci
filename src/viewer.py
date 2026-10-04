@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 import pandas as pd
+from PIL import Image, ImageOps, ImageTk, UnidentifiedImageError
+from tkinter import font as tkfont
 from settings import get_auto_scale_y, get_last_dir, set_auto_scale_y, set_last_dir
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -21,19 +23,40 @@ from tkinter import filedialog, messagebox
 PAGE_SIZE = 1000
 HEADER_ROWS = 2
 LINE_COLORS = ["#1F4E78", "#C00000", "#548235", "#BF8F00", "#7030A0", "#2E75B6", "#833C00"]
-CONFIG_DIR = Path(__file__).with_name("graph_configs")
-MENU_DIR = CONFIG_DIR
+CONFIGS_DIR = Path(__file__).with_name("Configs")
+LOGDEF_DIR = CONFIGS_DIR / "Logdefs"
+MENU_DIR = CONFIGS_DIR / "Menudefs"
+HELPDEF_DIR = CONFIGS_DIR / "Helpdefs"
+HELPDEF_PATH = HELPDEF_DIR / "Campbell_Sci.helpdef"
+HELP_IMAGE_PATH = Path(__file__).with_name("Meettoren.jpg")
 
 
 def read_dat_file(file_path: str | Path) -> pd.DataFrame:
     path = Path(file_path)
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    header_index = next(
-        (index for index, line in enumerate(lines) if line.strip().upper().startswith('"TIMESTAMP"') or line.strip().upper().startswith("TIMESTAMP")),
+    toa5_header_index = next(
+        (
+            index
+            for index, line in enumerate(lines)
+            if line.strip().upper().startswith('"TIMESTAMP"')
+            or line.strip().upper().startswith("TIMESTAMP")
+        ),
         None,
     )
+    toaci1_header_index = None
+    if lines and lines[0].lstrip().upper().startswith('"TOACI1"'):
+        toaci1_header_index = next(
+            (
+                index
+                for index, line in enumerate(lines[1:], 1)
+                if line.strip().upper().startswith('"TMSTAMP"')
+                or line.strip().upper().startswith("TMSTAMP")
+            ),
+            None,
+        )
+    header_index = toa5_header_index if toa5_header_index is not None else toaci1_header_index
     if header_index is None:
-        raise ValueError(f"Geen Campbell TOA5-header gevonden in {path.name}")
+        raise ValueError(f"Geen Campbell TOA5- of TOACI1-header gevonden in {path.name}")
     from io import StringIO
     data = pd.read_csv(
         StringIO("\n".join(lines[header_index:])),
@@ -46,6 +69,7 @@ def read_dat_file(file_path: str | Path) -> pd.DataFrame:
     if data.empty:
         raise ValueError(f"Geen meetgegevens gevonden in {path.name}")
     data.columns = [str(column).strip() for column in data.columns]
+    data.attrs["header_row_count"] = HEADER_ROWS if toa5_header_index is not None else 0
     return data
 
 
@@ -67,6 +91,8 @@ def _format_toa5_cell(value: Any, na_text: str) -> Any:
 def _read_preamble_lines(file_path: str | Path) -> list[str]:
     path = Path(file_path)
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    if lines and lines[0].lstrip().upper().startswith('"TOACI1"'):
+        return lines[:1]
     header_index = next(
         (index for index, line in enumerate(lines) if line.strip().upper().startswith('"TIMESTAMP"') or line.strip().upper().startswith("TIMESTAMP")),
         None,
@@ -74,11 +100,20 @@ def _read_preamble_lines(file_path: str | Path) -> list[str]:
     return lines[:header_index] if header_index else []
 
 
-def load_chart_config(logger: str, config_dir: str | Path = CONFIG_DIR) -> list[dict[str, Any]]:
-    path = Path(config_dir) / f"{logger.upper()}.logdef"
-    if not path.is_file() and logger.upper() == "BRAS":
-        path = Path(config_dir) / "BM.logdef"
-    if not path.is_file():
+def load_chart_config(
+    logger: str,
+    config_dir: str | Path = LOGDEF_DIR,
+    location: str | None = None,
+) -> list[dict[str, Any]]:
+    config_path = Path(config_dir)
+    candidates = []
+    if location:
+        candidates.append(config_path / f"{logger.upper()}_{location.upper()}.logdef")
+    candidates.append(config_path / f"{logger.upper()}.logdef")
+    if logger.upper() == "BRAS":
+        candidates.append(config_path / "BM.logdef")
+    path = next((candidate for candidate in candidates if candidate.is_file()), None)
+    if path is None:
         return []
     charts = []
     for line_number, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
@@ -119,7 +154,10 @@ def load_menu_config(name: str = "graph", menu_dir: str | Path = MENU_DIR) -> li
 
 
 def _header_lookup(data: pd.DataFrame) -> dict[str, str]:
-    return {str(column).strip().upper(): str(column) for column in data.columns}
+    headers = {str(column).strip().upper(): str(column) for column in data.columns}
+    if "TMSTAMP" in headers:
+        headers.setdefault("TIMESTAMP", headers["TMSTAMP"])
+    return headers
 
 
 def _resolve_header(headers: dict[str, str], configured: str) -> tuple[str, bool]:
@@ -151,9 +189,19 @@ def _fallback_charts(data: pd.DataFrame) -> list[dict[str, Any]]:
     return charts
 
 
-def _logger_from_path(path: Path) -> str:
-    match = re.search(r"\d{4}_\d{2}_\d{2}(?:_\d{2}(?:_\d{2}(?:_\d{2})?)?)?$", path.stem)
-    return path.stem[:match.start()].rstrip("_").upper() if match else path.stem.split("_")[0].upper()
+def logger_and_location_from_filename(path: Path) -> tuple[str, str | None]:
+    parts = path.stem.split("_")
+    logger = parts[0].strip()
+    if not logger:
+        raise ValueError(f"Kon geen loggernaam bepalen uit {path.name}")
+    location = parts[1].strip() if len(parts) > 1 else ""
+    if not location or re.fullmatch(r"\d{4}(?:-?\d{2}){0,2}", location):
+        location = None
+    return logger.upper(), location.upper() if location else None
+
+
+def logger_from_filename(path: Path) -> str:
+    return logger_and_location_from_filename(path)[0]
 
 
 def _x_values(series: pd.Series) -> tuple[pd.Series, bool]:
@@ -172,11 +220,13 @@ class CampbellViewer:
         self.data = data
         self.source = source
         self.logger = logger
+        self.location = logger_and_location_from_filename(source)[1]
         self.page = 0
         self._data_changed = False
         self.figures: list[Figure] = []
         self.canvases: list[FigureCanvasTkAgg] = []
         self.chart_axes: list[tuple[FigureCanvasTkAgg, list[Any], bool]] = []
+        self._tab_images: list[tk.PhotoImage] = []
         self._chart_origin_tab: str | None = None
         self._configure_window()
         self._build_shell()
@@ -187,6 +237,7 @@ class CampbellViewer:
     def _configure_window(self) -> None:
         self.root.title(f"Campbell Sci | {self.source.name}")
         self.root.geometry("1380x860")
+        self.root.state("zoomed")
         self.root.minsize(900, 600)
         self.root.configure(background="#F3F5F7")
         style = ttk.Style(self.root)
@@ -197,15 +248,16 @@ class CampbellViewer:
         style.configure("Toolbar.TLabel", background="#FFFFFF", foreground="#263442", font=("Segoe UI", 10))
         style.configure("TButton", padding=(10, 6), font=("Segoe UI", 9))
         style.configure("TNotebook", background="#F3F5F7", borderwidth=0)
-        style.configure("TNotebook.Tab", padding=(14, 8), font=("Segoe UI", 9))
+        style.configure("TNotebook.Tab", padding=(0, 0), font=("Segoe UI", 9))
         style.configure("Treeview", rowheight=24, font=("Segoe UI", 9), background="#FFFFFF", fieldbackground="#FFFFFF")
         style.configure("Treeview.Heading", font=("Segoe UI", 9, "bold"))
 
     def _build_shell(self) -> None:
         toolbar = ttk.Frame(self.root, style="Toolbar.TFrame", padding=(14, 10))
         toolbar.pack(fill="x")
-        ttk.Button(toolbar, text="Open .dat", command=self._choose_another_file).pack(side="left")
-        ttk.Button(toolbar, text="Nieuwe .logdef", command=self._open_logdef_editor).pack(side="left", padx=(8, 0))
+        ttk.Button(toolbar, text="Open Data", command=self._choose_another_file).pack(side="left")
+        ttk.Button(toolbar, text="LogDef Editor", command=self._open_logdef_editor).pack(side="left", padx=(8, 0))
+        ttk.Button(toolbar, text="Help", command=self._open_help).pack(side="left", padx=(8, 0))
         self.auto_scale_y = tk.BooleanVar(value=get_auto_scale_y())
         ttk.Checkbutton(
             toolbar, text="Y-as automatisch schalen bij zoomen", variable=self.auto_scale_y,
@@ -217,17 +269,45 @@ class CampbellViewer:
         ttk.Label(toolbar, textvariable=self.status, style="Toolbar.TLabel").pack(side="right")
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        footer = ttk.Frame(self.root, padding=(10, 3))
+        footer.pack(fill="x", side="bottom")
+        ttk.Label(footer, text="Author: Eddy Smesman").pack(side="right")
+
+    def _make_tab_image(self, label: str, color: str = "") -> tk.PhotoImage:
+        font = tkfont.Font(root=self.root, family="Segoe UI", size=9)
+        width = max(48, font.measure(label) + 24)
+        height = font.metrics("linespace") + 14
+        image = tk.PhotoImage(master=self.root, width=width, height=height)
+        if color:
+            try:
+                red, green, blue = self.root.winfo_rgb(color)
+            except tk.TclError as exc:
+                raise ValueError(f"Ongeldige tabkleur '{color}' voor '{label}'.") from exc
+            rgb = (red, green, blue)
+            background = "#{:02x}{:02x}{:02x}".format(
+                *(round((channel / 65535) * 0.35 * 255 + 0.65 * 255) for channel in rgb)
+            )
+        else:
+            background = "#E5E7EB"
+        image.put(background, to=(0, 0, width, height))
+        self._tab_images.append(image)
+        return image
 
     def _populate_tabs(self) -> None:
         self._clear_tabs()
         self._add_data_tab()
-        specs = load_chart_config(self.logger)
+        specs = load_chart_config(self.logger, location=self.location)
         if not specs:
             specs = _fallback_charts(self.data)
         if not specs:
             empty = ttk.Frame(self.notebook, padding=24)
             ttk.Label(empty, text="Geen numerieke meetkolommen om te tekenen.").pack(anchor="w")
-            self.notebook.add(empty, text="Grafieken")
+            self.notebook.add(
+                empty,
+                text="Grafieken",
+                image=self._make_tab_image("Grafieken"),
+                compound="center",
+            )
             return
         headers = _header_lookup(self.data)
         used_names: set[str] = set()
@@ -239,7 +319,12 @@ class CampbellViewer:
             chart_spec = dict(spec)
             chart_spec["name"] = name
             page = ttk.Frame(self.notebook)
-            self.notebook.add(page, text=name)
+            self.notebook.add(
+                page,
+                text=name,
+                image=self._make_tab_image(name, chart_spec["tab_color"]),
+                compound="center",
+            )
             try:
                 self._draw_chart(page, chart_spec, headers, self.data)
             except (KeyError, ValueError) as exc:
@@ -250,6 +335,7 @@ class CampbellViewer:
     def _clear_tabs(self) -> None:
         for tab in self.notebook.tabs():
             self.notebook.forget(tab)
+        self._tab_images.clear()
         for figure in self.figures:
             plt.close(figure)
         self.figures.clear()
@@ -276,11 +362,19 @@ class CampbellViewer:
 
     def _add_data_tab(self) -> None:
         page = ttk.Frame(self.notebook, padding=10)
-        self.notebook.add(page, text="Data")
+        self.notebook.add(
+            page,
+            text="Data",
+            image=self._make_tab_image("Data"),
+            compound="center",
+        )
         page.rowconfigure(1, weight=1)
         page.columnconfigure(0, weight=1)
         columns = [str(column) for column in self.data.columns]
-        self.header_row_count = HEADER_ROWS if len(self.data) > HEADER_ROWS else 0
+        self.header_row_count = min(
+            int(self.data.attrs.get("header_row_count", HEADER_ROWS)),
+            len(self.data),
+        )
         frozen_table = ttk.Treeview(
             page, columns=columns, show="headings", height=self.header_row_count, selectmode="none"
         )
@@ -1024,7 +1118,74 @@ class CampbellViewer:
 
     def _open_logdef_editor(self) -> None:
         from logdef_editor import LogdefEditor
-        LogdefEditor(self.root, [str(c) for c in self.data.columns], self.logger, CONFIG_DIR)
+        LogdefEditor(
+            self.root,
+            [str(c) for c in self.data.columns],
+            self.logger,
+            LOGDEF_DIR,
+            location=self.location,
+        )
+
+    def _open_help(self) -> None:
+        try:
+            help_text = HELPDEF_PATH.read_text(encoding="utf-8").strip()
+            if not help_text:
+                raise ValueError(f"De helptekst is leeg: {HELPDEF_PATH}")
+            with Image.open(HELP_IMAGE_PATH) as source_image:
+                help_image = ImageOps.contain(
+                    source_image.convert("RGB"),
+                    (460, 620),
+                    method=Image.Resampling.LANCZOS,
+                )
+        except (OSError, UnidentifiedImageError, ValueError) as exc:
+            messagebox.showerror("Help niet beschikbaar", str(exc), parent=self.root)
+            return
+
+        window = tk.Toplevel(self.root)
+        window.title("Campbell Sci - Help")
+        window.geometry("1080x740")
+        window.minsize(800, 560)
+        window.transient(self.root)
+        window.grab_set()
+
+        content = ttk.Frame(window, padding=16)
+        content.pack(fill="both", expand=True)
+        image_panel = ttk.Frame(content)
+        image_panel.pack(side="left", fill="y", padx=(0, 16))
+        photo = ImageTk.PhotoImage(help_image, master=window)
+        image_label = ttk.Label(image_panel, image=photo)
+        image_label.image = photo
+        image_label.pack(anchor="n")
+
+        text_panel = ttk.Frame(content)
+        text_panel.pack(side="left", fill="both", expand=True)
+        text_panel.rowconfigure(0, weight=1)
+        text_panel.columnconfigure(0, weight=1)
+        help_widget = tk.Text(
+            text_panel,
+            wrap="word",
+            font=("Segoe UI", 10),
+            padx=12,
+            pady=12,
+            relief="flat",
+            background="#FFFFFF",
+        )
+        help_widget.tag_configure("title", font=("Segoe UI", 16, "bold"), spacing3=12)
+        help_widget.tag_configure("heading", font=("Segoe UI", 11, "bold"), spacing1=12, spacing3=4)
+        scrollbar = ttk.Scrollbar(text_panel, orient="vertical", command=help_widget.yview)
+        help_widget.configure(yscrollcommand=scrollbar.set)
+        help_widget.grid(row=0, column=0, sticky="nsew")
+        scrollbar.grid(row=0, column=1, sticky="ns")
+        for line in help_text.splitlines():
+            if line.startswith("# "):
+                help_widget.insert("end", line[2:] + "\n", "title")
+            elif line.startswith("## "):
+                help_widget.insert("end", line[3:] + "\n", "heading")
+            else:
+                help_widget.insert("end", line + "\n")
+        help_widget.configure(state="disabled")
+
+        ttk.Button(content, text="Sluiten", command=window.destroy).pack(side="bottom", anchor="e", pady=(12, 0))
 
     def _choose_another_file(self) -> None:
         selected = filedialog.askopenfilename(
@@ -1039,13 +1200,14 @@ class CampbellViewer:
         set_last_dir(source.parent)
         try:
             data = read_dat_file(source)
-            logger = _logger_from_path(source)
+            logger = logger_from_filename(source)
+            location = logger_and_location_from_filename(source)[1]
             if logger in {"BM", "BRAS"}:
                 data = data.replace(["6999", "-6999", "7999", "-7999", "NAN", "INF"], float("nan"))
                 if "IR_R_R_Avg" in data.columns:
                     infrared = pd.to_numeric(data["IR_R_R_Avg"], errors="coerce")
                     data["Leaf T."] = (infrared / 0.0000000567) ** 0.25 - 273.16
-            self.data, self.source, self.logger, self.page = data, source, logger, 0
+            self.data, self.source, self.logger, self.location, self.page = data, source, logger, location, 0
             self._data_changed = False
             self.root.title(f"Campbell Sci | {source.name}")
             self.file_label.configure(text=source.name)

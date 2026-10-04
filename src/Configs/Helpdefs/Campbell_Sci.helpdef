@@ -1,0 +1,18 @@
+# Campbell Sci Viewer
+
+## Een databestand openen
+Gebruik Open Data om een Campbell .dat-bestand te openen. TOA5- en TOACI1-bestanden worden ondersteund. De viewer kiest de grafiekconfiguratie op basis van de loggernaam en, indien aanwezig, de locatiecode.
+
+## Grafieken bekijken
+De Data-tab toont de ingelezen meetwaarden. De andere tabs tonen grafieken uit de bijbehorende .logdef-configuratie. Tabkleuren helpen grafieken per onderwerp te herkennen, bijvoorbeeld geel voor zon en blauw voor neerslag.
+
+## Data aanpassen en opslaan
+Dubbelklik op een cel in de Data-tab om de waarde te wijzigen. Gebruik Opslaan om de gewijzigde data als een nieuw .dat-bestand op te slaan; het oorspronkelijke bestand wordt niet overschreven.
+
+## Grafieken en configuraties aanpassen
+Open LogDef Editor om grafieken samen te stellen en een .logdef-bestand te laden of op te slaan. Loggerconfiguraties staan in Configs/Logdefs. Als er een locatiecode in de bestandsnaam staat, wordt eerst een configuratie voor die logger en locatie gezocht; anders wordt de algemene loggerconfiguratie gebruikt.
+
+Menuconfiguraties staan in Configs/Menudefs. Deze helptekst staat in Configs/Helpdefs/Campbell_Sci.helpdef en kan daar worden aangepast.
+
+## Navigeren in grafieken
+Gebruik het muiswiel boven de grafiek om horizontaal in of uit te zoomen. Plaats de muis boven de linker- of rechtermarge van de plot en gebruik het muiswiel om door de meetperiode te schuiven.
