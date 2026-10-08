@@ -4,6 +4,8 @@ import csv
 import math
 from pathlib import Path
 import re
+import shutil
+import sys
 from tkinter import ttk
 from typing import Any
 
@@ -23,12 +25,41 @@ from tkinter import filedialog, messagebox
 PAGE_SIZE = 1000
 HEADER_ROWS = 2
 LINE_COLORS = ["#1F4E78", "#C00000", "#548235", "#BF8F00", "#7030A0", "#2E75B6", "#833C00"]
-CONFIGS_DIR = Path(__file__).with_name("Configs")
+_APP_DIR = (
+    Path(sys.executable).resolve().parent
+    if getattr(sys, "frozen", False)
+    else Path(__file__).resolve().parent
+)
+CONFIGS_DIR = _APP_DIR / "Configs"
 LOGDEF_DIR = CONFIGS_DIR / "Logdefs"
 MENU_DIR = CONFIGS_DIR / "Menudefs"
 HELPDEF_DIR = CONFIGS_DIR / "Helpdefs"
 HELPDEF_PATH = HELPDEF_DIR / "Campbell_Sci.helpdef"
-HELP_IMAGE_PATH = Path(__file__).with_name("Meettoren.jpg")
+HELP_IMAGE_PATH = HELPDEF_DIR / "Meettoren.jpg"
+
+
+def application_icon_path() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(__file__).with_name("CampBell Icon.ico")
+    return Path(__file__).resolve().parent.parent / "screenshots" / "CampBell Icon.ico"
+
+
+def prepare_external_configs() -> None:
+    if not getattr(sys, "frozen", False):
+        return
+
+    bundled_configs = Path(__file__).with_name("Configs")
+    if not bundled_configs.is_dir():
+        raise FileNotFoundError(f"Gebundelde configuratiemap niet gevonden: {bundled_configs}")
+
+    CONFIGS_DIR.mkdir(parents=True, exist_ok=True)
+    for source in bundled_configs.rglob("*"):
+        destination = CONFIGS_DIR / source.relative_to(bundled_configs)
+        if source.is_dir():
+            destination.mkdir(parents=True, exist_ok=True)
+        elif not destination.exists():
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
 
 
 def read_dat_file(file_path: str | Path) -> pd.DataFrame:
@@ -228,14 +259,73 @@ class CampbellViewer:
         self.chart_axes: list[tuple[FigureCanvasTkAgg, list[Any], bool]] = []
         self._tab_images: list[tk.PhotoImage] = []
         self._chart_origin_tab: str | None = None
+        self._window_icon_handles: list[int] = []
         self._configure_window()
         self._build_shell()
         self._populate_tabs()
+        self._apply_window_icon()
+        self.root.after(100, self._activate_window)
         self._last_selected_tab = self.notebook.select()
         self.notebook.bind("<<NotebookTabChanged>>", self._on_notebook_tab_changed)
 
+    def _activate_window(self) -> None:
+        self.root.deiconify()
+        self.root.state("zoomed")
+        self.root.lift()
+        self.root.focus_force()
+        if sys.platform == "win32":
+            import ctypes
+            from ctypes import wintypes
+
+            user32 = ctypes.WinDLL("user32", use_last_error=True)
+            user32.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
+            user32.GetAncestor.restype = wintypes.HWND
+            user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+            user32.SetForegroundWindow.restype = wintypes.BOOL
+            hwnd = user32.GetAncestor(self.root.winfo_id(), 2) or self.root.winfo_id()
+            user32.SetForegroundWindow(hwnd)
+
+    def _apply_window_icon(self) -> None:
+        icon = str(application_icon_path())
+        self.root.iconbitmap(default=icon)
+        self.root.iconbitmap(icon)
+        if sys.platform != "win32":
+            return
+        import ctypes
+        from ctypes import wintypes
+
+        self.root.update_idletasks()
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        user32.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
+        user32.GetAncestor.restype = wintypes.HWND
+        user32.GetSystemMetrics.argtypes = [ctypes.c_int]
+        user32.GetSystemMetrics.restype = ctypes.c_int
+        user32.LoadImageW.argtypes = [
+            wintypes.HINSTANCE, wintypes.LPCWSTR, wintypes.UINT,
+            ctypes.c_int, ctypes.c_int, wintypes.UINT,
+        ]
+        user32.LoadImageW.restype = wintypes.HANDLE
+        user32.SendMessageW.argtypes = [
+            wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM,
+        ]
+        user32.SendMessageW.restype = ctypes.c_ssize_t
+        set_class_long_ptr = getattr(user32, "SetClassLongPtrW", user32.SetClassLongW)
+        set_class_long_ptr.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
+        set_class_long_ptr.restype = ctypes.c_size_t
+
+        hwnd = user32.GetAncestor(self.root.winfo_id(), 2) or self.root.winfo_id()
+        for kind, metric, class_index in ((1, 11, -14), (0, 49, -34)):
+            size = user32.GetSystemMetrics(metric)
+            handle = user32.LoadImageW(None, icon, 1, size, size, 0x10)
+            if not handle:
+                raise ctypes.WinError(ctypes.get_last_error())
+            self._window_icon_handles.append(handle)
+            user32.SendMessageW(hwnd, 0x80, kind, handle)
+            set_class_long_ptr(hwnd, class_index, handle)
+
     def _configure_window(self) -> None:
         self.root.title(f"Campbell Sci | {self.source.name}")
+        self.root.iconbitmap(str(application_icon_path()))
         self.root.geometry("1380x860")
         self.root.state("zoomed")
         self.root.minsize(900, 600)
@@ -1118,13 +1208,14 @@ class CampbellViewer:
 
     def _open_logdef_editor(self) -> None:
         from logdef_editor import LogdefEditor
-        LogdefEditor(
+        editor = LogdefEditor(
             self.root,
             [str(c) for c in self.data.columns],
             self.logger,
             LOGDEF_DIR,
             location=self.location,
         )
+        editor.iconbitmap(str(application_icon_path()))
 
     def _open_help(self) -> None:
         try:
@@ -1143,6 +1234,7 @@ class CampbellViewer:
 
         window = tk.Toplevel(self.root)
         window.title("Campbell Sci - Help")
+        window.iconbitmap(str(application_icon_path()))
         window.geometry("1080x740")
         window.minsize(800, 560)
         window.transient(self.root)

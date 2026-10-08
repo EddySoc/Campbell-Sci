@@ -26,5 +26,5 @@ campbell_sci_new = [
   "Configs/Logdefs/*.logdef",
   "Configs/Menudefs/*.menudef",
   "Configs/Helpdefs/*.helpdef",
-  "Meettoren.jpg",
+  "Configs/Helpdefs/Meettoren.jpg",
 ]

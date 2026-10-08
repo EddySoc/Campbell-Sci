@@ -8,11 +8,20 @@ De Data-tab toont de ingelezen meetwaarden. De andere tabs tonen grafieken uit d
 
 ## Data aanpassen en opslaan
 Dubbelklik op een cel in de Data-tab om de waarde te wijzigen. Gebruik Opslaan om de gewijzigde data als een nieuw .dat-bestand op te slaan; het oorspronkelijke bestand wordt niet overschreven.
+Er kunnen ook meerdere waarden worden aangeduid om te resetten.
 
 ## Grafieken en configuraties aanpassen
-Open LogDef Editor om grafieken samen te stellen en een .logdef-bestand te laden of op te slaan. Loggerconfiguraties staan in Configs/Logdefs. Als er een locatiecode in de bestandsnaam staat, wordt eerst een configuratie voor die logger en locatie gezocht; anders wordt de algemene loggerconfiguratie gebruikt.
-
-Menuconfiguraties staan in Configs/Menudefs. Deze helptekst staat in Configs/Helpdefs/Campbell_Sci.helpdef en kan daar worden aangepast.
+Open LogDef Editor om grafieken samen te stellen en een .logdef-bestand te laden, te editeren en op te slaan. Loggerconfiguraties staan in Configs/Logdefs. Als er een locatiecode in de bestandsnaam staat, wordt eerst een configuratie voor die logger en locatie gezocht; anders wordt de algemene loggerconfiguratie gebruikt.
 
 ## Navigeren in grafieken
-Gebruik het muiswiel boven de grafiek om horizontaal in of uit te zoomen. Plaats de muis boven de linker- of rechtermarge van de plot en gebruik het muiswiel om door de meetperiode te schuiven.
+Gebruik het muiswiel boven de grafiek om horizontaal in of uit te zoomen. Plaats de muis boven de linker- of rechtermarge van de plot en gebruik het muiswiel om door de meetperiode te schuiven. Maximalisatie tijdens het scrollen is mogelijk door Y-as automatisch schalen aan te vinken.
+
+## Context menus
+De context menus kunnen verkregen worden door het rechts klikken met de muis in de data tab of een grafiek tab.
+Voor Ga naa cel moet er wel op een grafieklijn gerechtsklikt worden
+
+## Menu configuraties
+Menuconfiguraties staan in Configs/Menudefs zodat ze makkelijk voor eventuele aanpassing of uitbreiding beschikbaar zijn.
+
+## Helptekst
+Deze helptekst staat in Configs/Helpdefs/Campbell_Sci.helpdef en kan daar worden aangepast.

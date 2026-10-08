@@ -1,13 +1,27 @@
 from __future__ import annotations
 
+import ctypes
 from pathlib import Path
+import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
 import pandas as pd
 
 from settings import get_last_dir, set_last_dir
-from viewer import CampbellViewer, logger_from_filename, read_dat_file
+from viewer import CampbellViewer, logger_from_filename, prepare_external_configs, read_dat_file
+
+
+def set_windows_app_user_model_id() -> None:
+    if sys.platform != "win32":
+        return
+
+    set_app_id = ctypes.WinDLL("shell32", use_last_error=True).SetCurrentProcessExplicitAppUserModelID
+    set_app_id.argtypes = [ctypes.c_wchar_p]
+    set_app_id.restype = ctypes.c_long
+    result = set_app_id("EddySoc.CampbellSciViewer.2")
+    if result < 0:
+        raise OSError(f"Windows kon de app-identiteit niet instellen (HRESULT 0x{result & 0xFFFFFFFF:08X})")
 
 
 def choose_dat_file(parent: tk.Misc | None = None) -> str:
@@ -20,6 +34,17 @@ def choose_dat_file(parent: tk.Misc | None = None) -> str:
 
 
 def main() -> None:
+    set_windows_app_user_model_id()
+
+    try:
+        prepare_external_configs()
+    except OSError as exc:
+        messagebox.showerror(
+            "Campbell Sci",
+            f"De configuratiemap naast het programma kon niet worden aangemaakt:\n{exc}",
+        )
+        return
+
     chooser = tk.Tk()
     chooser.withdraw()
     file_path = choose_dat_file(chooser)
