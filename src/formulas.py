@@ -87,7 +87,8 @@ ALIASES = {
     "SOM": "SUM", "GEMIDDELDE": "AVERAGE", "ALS": "IF", "EN": "AND", "OF": "OR", "NIET": "NOT",
     "WORTEL": "SQRT", "AFRONDEN": "ROUND", "MACHT": "POWER", "REST": "MOD", "HELE": "INT",
     "DAYMIN": "DAGMIN", "DAYMAX": "DAGMAX", "DAYSUM": "DAGSOM", "DAYAVG": "DAGGEM", "DAYAVERAGE": "DAGGEM",
-    "VERSCHIL": "DIFF", "GLIJDEND": "ROLLAVG",
+    "VERSCHIL": "DIFF", "GLIJDEND": "ROLLAVG", "MULTIPLY": "PRODUCT",
+    "AFTREKKEN": "SUBTRACT", "VERMENIGVULDIGEN": "PRODUCT", "DELEN": "DIVIDE",
 }
 
 # naam -> beschrijving (voor de editor)
@@ -97,6 +98,9 @@ FUNCTION_HELP = {
     "DAGSOM": "DAGSOM([kolom]) - totaal per dag",
     "DAGGEM": "DAGGEM([kolom]) - gemiddelde per dag",
     "SUM": "SUM(a; b; ...) - som per rij (SOM)",
+    "SUBTRACT": "SUBTRACT(a; b; ...) - trek waarden per rij van elkaar af (AFTREKKEN)",
+    "PRODUCT": "PRODUCT(a; b; ...) - vermenigvuldig waarden per rij (MULTIPLY)",
+    "DIVIDE": "DIVIDE(a; b; ...) - deel waarden per rij achtereenvolgens (DELEN)",
     "MIN": "MIN(a; b; ...) - minimum per rij",
     "MAX": "MAX(a; b; ...) - maximum per rij",
     "AVERAGE": "AVERAGE(a; b; ...) - gemiddelde per rij (GEMIDDELDE)",
@@ -272,6 +276,19 @@ class _Evaluator:
         def calculate(*values: Any) -> pd.Series:
             if not values:
                 raise FormulaError("Minstens één argument nodig.")
+            if how in {"subtract", "divide"} and len(values) < 2:
+                raise FormulaError("Minstens twee argumenten nodig.")
+            if how in {"subtract", "multiply", "divide"}:
+                result = self.series(values[0]).astype(float)
+                for value in values[1:]:
+                    operand = self.series(value).astype(float)
+                    if how == "subtract":
+                        result = result - operand
+                    elif how == "multiply":
+                        result = result * operand
+                    else:
+                        result = result / operand
+                return result
             frame = pd.concat([self.series(v).astype(float) for v in values], axis=1)
             if how == "sum":
                 return frame.sum(axis=1, min_count=1)
@@ -304,6 +321,8 @@ class _Evaluator:
             "DAGSOM": self._daily("sum"), "DAGGEM": self._daily("mean"),
             "SUM": self._across("sum"), "MIN": self._across("min"),
             "MAX": self._across("max"), "AVERAGE": self._across("mean"),
+            "SUBTRACT": self._across("subtract"), "PRODUCT": self._across("multiply"),
+            "DIVIDE": self._across("divide"),
             "IF": self._if,
             "AND": self._logic(np.logical_and), "OR": self._logic(np.logical_or),
             "NOT": lambda value: ~np.asarray(self.boolean(value)) if isinstance(value, pd.Series) else not value,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import tkinter as tk
 from tkinter import messagebox, ttk
 from typing import Callable
@@ -110,21 +111,26 @@ class FormulaEditor(tk.Toplevel):
         for header in self.headers + earlier:
             self.columns_box.insert("end", header)
 
-    def _insert_text(self, text: str) -> None:
+    def _insert_text(self, text: str, cursor_before_end: int = 0) -> None:
         self.expression.insert("insert", text)
+        if cursor_before_end:
+            self.expression.mark_set("insert", f"insert-{cursor_before_end}c")
         self.expression.focus_set()
 
     def _insert_column(self, _event: object) -> None:
         selection = self.columns_box.curselection()
         if selection:
-            self._insert_text(f"[{self.columns_box.get(selection[0])}]")
+            self._insert_text(f"[{self.columns_box.get(selection[0])}],")
 
     def _insert_function(self, _event: object) -> None:
         selection = self.functions_box.curselection()
         if selection:
             name = self.function_names[selection[0]]
             macro = self.macros.get(name.upper())
-            self._insert_text(name if macro and macro["params"] is None else name + "(")
+            if macro and macro["params"] is None:
+                self._insert_text(name)
+            else:
+                self._insert_text(name + "()", cursor_before_end=1)
 
     def _load_macros(self) -> None:
         try:
@@ -173,7 +179,9 @@ class FormulaEditor(tk.Toplevel):
             return
         formula = self.formulas[self.current]
         formula["name"] = self.name_var.get().strip() or f"Berekening {self.current + 1}"
-        formula["expression"] = self.expression.get("1.0", "end").strip()
+        expression = self.expression.get("1.0", "end").strip()
+        expression = re.sub(r",(?=\s*\))", "", expression)
+        formula["expression"] = expression[:-1].rstrip() if expression.endswith(",") else expression
         self.formula_list.delete(self.current)
         self.formula_list.insert(self.current, formula["name"])
 

@@ -16,6 +16,41 @@ Open LogDef Editor om grafieken samen te stellen en een .logdef-bestand te laden
 ## Navigeren in grafieken
 Gebruik het muiswiel boven de grafiek om horizontaal in of uit te zoomen. Plaats de muis boven de linker- of rechtermarge van de plot en gebruik het muiswiel om door de meetperiode te schuiven. Maximalisatie tijdens het scrollen is mogelijk door Y-as automatisch schalen aan te vinken.
 
+## Formules en eigen functies
+Open Formule Editor om berekende kolommen aan de meetdata toe te voegen. Geef iedere berekening een naam en schrijf de formule in het formuleveld. Met Test formule controleer je de formule; Opslaan en toepassen berekent de kolom en voegt die toe aan de data.
+
+### Formules schrijven
+Verwijs naar een bestaande kolom met de kolomnaam tussen vierkante haken, bijvoorbeeld `[Temp_02_m_Avg] * 1.8 + 32`. De kolommenlijst voegt een geselecteerde kolom in; dubbelklik of gebruik Kolom invoegen.
+Gebruik puntnotatie voor decimalen. De editor voegt een functie als `FUNCTIE()` in met de cursor tussen de haakjes. Een gekozen kolom wordt op de cursorpositie ingevoegd, gevolgd door een komma; een overbodige komma aan het einde wordt bij bevestigen verwijderd. Functieargumenten mogen met komma's of puntkomma's worden gescheiden. Voorbeelden:
+- `[Temp_02_m_Avg] - [Temp_02_m_Min]`
+- `IF([Regen] > 0; 1; 0)`
+- `DAGGEM([Temp_02_m_Avg])`
+
+De gebruikelijke rekenoperatoren zijn `+`, `-`, `*`, `/`, `^` (macht) en `%` (rest). Vergelijkingen zoals `>`, `>=`, `<`, `<=`, `=` en `<>` kunnen in voorwaarden worden gebruikt. `AND`, `OR` en `NOT` combineren voorwaarden; `TRUE` en `FALSE` zijn beschikbaar als logische waarden. `PI` is de constante pi. Formules worden per meetrij berekend.
+
+Formules staan in `Configs/Formuladefs` in bestanden met de indeling `naam;formule`. De editor gebruikt, als die bestaat, eerst een bestand voor de logger en locatie (`LOGGER_LOCATIE.formuladef`), anders het algemene loggerbestand (`LOGGER.formuladef`). Bij loggercode BRAS is `BM.formuladef` de terugvaloptie. De volgorde in de editor is de rekenvolgorde: een formule kan kolommen uit eerdere formules gebruiken. Gebruik Omhoog en Omlaag om die volgorde te wijzigen.
+
+### Ingebouwde functies
+In de data is een rij één meetmoment en een kolom één meetgrootheid. Argumenten in de voorbeelden zijn invoerwaarden; scheid meerdere argumenten met komma's of puntkomma's.
+- Kolommen combineren op hetzelfde meetmoment: `SUM(a; b; ...)`, `SUBTRACT(a; b; ...)`, `PRODUCT(a; b; ...)` (ook `MULTIPLY`), `DIVIDE(a; b; ...)`, `MIN(a; b; ...)`, `MAX(a; b; ...)` en `AVERAGE(a; b; ...)` werken per rij op de opgegeven kolommen. Bijvoorbeeld `SUBTRACT([Meting_A]; [Meting_B])` trekt de tweede waarde af van de eerste; `DIVIDE([Meting_A]; [Meting_B])` deelt de eerste door de tweede. Met meerdere argumenten worden aftrekken en delen achtereenvolgens van links naar rechts uitgevoerd. `SUM` telt dus niet alle rijen van één kolom over de tijd op. Let erop dat combineren alleen zinvol is als de meetgrootheden en eenheden bij elkaar passen.
+- Eén kolom samenvatten door de tijd per dag: `DAGMIN(x)`, `DAGMAX(x)`, `DAGSOM(x)` en `DAGGEM(x)` berekenen respectievelijk minimum, maximum, som en gemiddelde van die kolom voor iedere dag.
+- Voorwaarden: `IF(voorwaarde; waarde_als_waar; waarde_als_onwaar)`, `AND(a; b; ...)`, `OR(a; b; ...)` en `NOT(a)`.
+- Rekenen: `ABS(x)`, `SQRT(x)`, `ROUND(x; decimalen)`, `INT(x)`, `POWER(x; y)`, `MOD(x; y)`, `LN(x)`, `LOG10(x)` en `EXP(x)`.
+- Trigonometrie: `SIN(x)`, `COS(x)` en `TAN(x)` verwachten radialen. Gebruik `RADIANS(graden)` of `DEGREES(radialen)` om om te rekenen.
+- Tijdreeksen: `DIFF(x)` geeft voor één kolom het verschil met de vorige meetrij; `ROLLAVG(x; n)` geeft voor één kolom het voortschrijdend gemiddelde over n opeenvolgende meetrijen.
+- Tijd en zon: `STAP()` geeft de tijdstap in uren, `UUR()` de tijd van de meetrij als decimaal uur, en `ZONOP(breedte; lengte; utc)` en `ZONONDER(breedte; lengte; utc)` de zonsopkomst en zonsondergang als decimaal uur. `utc` is het verschil tussen logger-tijd en UTC in uren.
+
+Nederlandse aliassen zijn beschikbaar: `SOM` (SUM), `AFTREKKEN` (SUBTRACT), `VERMENIGVULDIGEN` (PRODUCT), `DELEN` (DIVIDE), `GEMIDDELDE` (AVERAGE), `ALS` (IF), `EN` (AND), `OF` (OR), `NIET` (NOT), `WORTEL` (SQRT), `AFRONDEN` (ROUND), `MACHT` (POWER), `REST` (MOD), `HELE` (INT), `VERSCHIL` (DIFF) en `GLIJDEND` (ROLLAVG). De dagfuncties hebben ook de Engelse aliassen `DAYMIN`, `DAYMAX`, `DAYSUM`, `DAYAVG` en `DAYAVERAGE`.
+
+### Eigen functies en constanten
+De knop Eigen functies bewerken... opent `Configs/Functiedefs/Functies.funcdef`. Eigen definities worden voor alle loggers geladen. Een constante heeft de vorm `NAAM = waarde_of_formule`; een functie heeft de vorm `NAAM(parameter1; parameter2) = formule`. Gebruik parameters in de formule als `parameter1` of `[parameter1]`. Voorbeelden:
+
+`FACTOR = 1.8`
+
+`NAAR_CELSIUS(f) = (f - 32) / FACTOR`
+
+Dubbelklik op een functie in de functielijst om die met haakjes in te voegen; de cursor staat tussen de haakjes. Eigen constanten worden zonder haakjes ingevoegd. Eigen functies kunnen ingebouwde functies en constanten gebruiken. Namen van ingebouwde functies en constanten kunnen niet opnieuw worden gedefinieerd.
+
 ## Context menus
 De context menus kunnen verkregen worden door het rechts klikken met de muis in de data tab of een grafiek tab.
 Voor Ga naa cel moet er wel op een grafieklijn gerechtsklikt worden
