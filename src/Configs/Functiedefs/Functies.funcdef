@@ -1,0 +1,18 @@
+# Eigen functies en constanten (worden voor alle loggers geladen)
+# Constante:  NAAM = waarde of formule
+# Functie:    NAAM(param1; param2) = formule   (parameters als [param1] of param1)
+# Ingebouwd voor de zon: ZONOP(breedte; lengte; utc), ZONONDER(...), STAP(), UUR()
+
+# Locatie van de meettoren: pas aan! UTC = tijdverschil van de logger-tijd met UTC in uren.
+LAT = 52.1
+LON = 5.18
+UTC = 1
+
+# Uren zonneschijn per dag: tijd waarop straling >= 120 W/m2 (WMO-drempel)
+ZONUREN(straling) = DAGSOM(IF([straling] >= 120; STAP(); 0))
+
+# Astronomische daglengte in uren
+DAGLENGTE() = ZONONDER(LAT; LON; UTC) - ZONOP(LAT; LON; UTC)
+
+# Zonneschijnduur als percentage van de daglengte
+ZONPERCENTAGE(straling) = 100 * ZONUREN([straling]) / DAGLENGTE()

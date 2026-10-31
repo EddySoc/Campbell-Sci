@@ -4,6 +4,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+from formulas import backup_original
+
 CHART_TYPES = ["line", "bar", "scatter", "windroos"]
 COLORS = ["", "red", "blue", "cyan", "yellow", "green", "orange", "purple", "gray", "black"]
 HEADER = (
@@ -45,8 +47,23 @@ class LogdefEditor(tk.Toplevel):
         self.config_dir = Path(config_dir)
         self.charts: list[dict] = []
         self.current: int | None = None
+        self.loaded_path = self._find_existing()
         self._build()
-        self._add_chart()
+        charts = self._read_charts(self.loaded_path) if self.loaded_path else None
+        if charts:
+            self._set_charts(charts)
+            self.title(f"Logdef bewerken - {self.loaded_path.name}")
+        else:
+            self._add_chart()
+
+    def _find_existing(self) -> Path | None:
+        names = []
+        if self.location:
+            names.append(f"{self.logger.upper()}_{self.location.upper()}.logdef")
+        names.append(f"{self.logger.upper()}.logdef")
+        if self.logger.upper() == "BRAS":
+            names.append("BM.logdef")
+        return next((self.config_dir / n for n in names if (self.config_dir / n).is_file()), None)
 
     def _build(self) -> None:
         left = ttk.Frame(self, padding=8)
@@ -205,15 +222,25 @@ class LogdefEditor(tk.Toplevel):
             initialfile=f"{config_name}.logdef", filetypes=[("Logdef", "*.logdef")])
         if not path:
             return
+        charts = self._read_charts(Path(path))
+        if charts is None:
+            return
+        if not charts:
+            messagebox.showwarning("Logdef", "Geen grafieken gevonden in dit bestand.", parent=self)
+            return
+        self.loaded_path = Path(path)
+        self._set_charts(charts)
+
+    def _read_charts(self, path: Path) -> list[dict] | None:
         charts = []
-        for number, raw in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), 1):
+        for number, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             line = raw.strip()
             if not line or line.startswith("#"):
                 continue
             fields = [f.strip() for f in line.split(";")]
             if len(fields) != 7:
-                messagebox.showerror("Logdef", f"Ongeldige regel {number} in {Path(path).name}", parent=self)
-                return
+                messagebox.showerror("Logdef", f"Ongeldige regel {number} in {path.name}", parent=self)
+                return None
             name, kind, columns, minimum, maximum, fmt, color = fields
             cols = [c.strip() for c in columns.split(",") if c.strip()]
             # De tijdkolom wordt bij opslaan weer automatisch toegevoegd.
@@ -221,9 +248,9 @@ class LogdefEditor(tk.Toplevel):
                 cols = cols[1:]
             charts.append({"name": name, "type": kind.lower(), "columns": cols, "minimum": minimum,
                            "maximum": maximum, "format": fmt, "color": color})
-        if not charts:
-            messagebox.showwarning("Logdef", "Geen grafieken gevonden in dit bestand.", parent=self)
-            return
+        return charts
+
+    def _set_charts(self, charts: list[dict]) -> None:
         self.charts = charts
         self.current = None
         self.chart_list.delete(0, "end")
@@ -248,12 +275,13 @@ class LogdefEditor(tk.Toplevel):
         if not charts:
             messagebox.showwarning("Logdef", "Kies kolommen voor minstens één grafiek.", parent=self)
             return
-        config_name = f"{self.logger}_{self.location}" if self.location else self.logger
+        config_name = self.loaded_path.stem if self.loaded_path else (f"{self.logger}_{self.location}" if self.location else self.logger)
         path = filedialog.asksaveasfilename(
             parent=self, title="Opslaan als", defaultextension=".logdef", initialdir=self.config_dir,
             initialfile=f"{config_name}.logdef", filetypes=[("Logdef", "*.logdef")])
         if not path:
             return
         lines = [chart_to_line(chart, self.time_column) for chart in charts]
+        backup_original(path)
         Path(path).write_text(HEADER + "\n".join(lines) + "\n", encoding="utf-8")
         messagebox.showinfo("Logdef", f"Opgeslagen: {path}", parent=self)

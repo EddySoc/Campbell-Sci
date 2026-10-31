@@ -18,6 +18,7 @@ from matplotlib.figure import Figure
 import pandas as pd
 from PIL import Image, ImageOps, ImageTk, UnidentifiedImageError
 from tkinter import font as tkfont
+from formulas import apply_formulas, load_formulas, load_funcdefs
 from settings import get_auto_scale_y, get_last_dir, set_auto_scale_y, set_last_dir
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -33,6 +34,8 @@ _APP_DIR = (
 CONFIGS_DIR = _APP_DIR / "Configs"
 LOGDEF_DIR = CONFIGS_DIR / "Logdefs"
 MENU_DIR = CONFIGS_DIR / "Menudefs"
+FORMULA_DIR = CONFIGS_DIR / "Formuladefs"
+FUNCTION_DIR = CONFIGS_DIR / "Functiedefs"
 HELPDEF_DIR = CONFIGS_DIR / "Helpdefs"
 HELPDEF_PATH = HELPDEF_DIR / "Campbell_Sci.helpdef"
 HELP_IMAGE_PATH = HELPDEF_DIR / "Meettoren.jpg"
@@ -253,6 +256,10 @@ class CampbellViewer:
         self.logger = logger
         self.location = logger_and_location_from_filename(source)[1]
         self.page = 0
+        self.data2_page = 0
+        self.chart_data = data
+        self.calc_columns: list[str] = []
+        self.formula_errors: list[str] = []
         self._data_changed = False
         self.figures: list[Figure] = []
         self.canvases: list[FigureCanvasTkAgg] = []
@@ -347,6 +354,7 @@ class CampbellViewer:
         toolbar.pack(fill="x")
         ttk.Button(toolbar, text="Open Data", command=self._choose_another_file).pack(side="left")
         ttk.Button(toolbar, text="LogDef Editor", command=self._open_logdef_editor).pack(side="left", padx=(8, 0))
+        ttk.Button(toolbar, text="Formule Editor", command=self._open_formula_editor).pack(side="left", padx=(8, 0))
         ttk.Button(toolbar, text="Help", command=self._open_help).pack(side="left", padx=(8, 0))
         self.auto_scale_y = tk.BooleanVar(value=get_auto_scale_y())
         ttk.Checkbutton(
@@ -386,9 +394,11 @@ class CampbellViewer:
     def _populate_tabs(self) -> None:
         self._clear_tabs()
         self._add_data_tab()
+        self._compute_calc()
+        self._add_data2_tab()
         specs = load_chart_config(self.logger, location=self.location)
         if not specs:
-            specs = _fallback_charts(self.data)
+            specs = _fallback_charts(self.chart_data)
         if not specs:
             empty = ttk.Frame(self.notebook, padding=24)
             ttk.Label(empty, text="Geen numerieke meetkolommen om te tekenen.").pack(anchor="w")
@@ -399,7 +409,7 @@ class CampbellViewer:
                 compound="center",
             )
             return
-        headers = _header_lookup(self.data)
+        headers = _header_lookup(self.chart_data)
         used_names: set[str] = set()
         for index, spec in enumerate(specs):
             name = spec["name"] or f"Grafiek {index + 1}"
@@ -416,11 +426,94 @@ class CampbellViewer:
                 compound="center",
             )
             try:
-                self._draw_chart(page, chart_spec, headers, self.data)
+                self._draw_chart(page, chart_spec, headers, self.chart_data)
             except (KeyError, ValueError) as exc:
                 ttk.Label(page, text=f"Grafiek kan niet worden opgebouwd: {exc}", padding=24).pack(anchor="w")
-        if len(self.notebook.tabs()) > 1:
-            self.notebook.select(self.notebook.tabs()[1])
+        if len(self.notebook.tabs()) > 2:
+            self.notebook.select(self.notebook.tabs()[2])
+
+    def _compute_calc(self) -> None:
+        errors: list[str] = []
+        try:
+            formulas = load_formulas(self.logger, self.location, FORMULA_DIR)
+        except ValueError as exc:
+            formulas = []
+            errors.append(str(exc))
+        try:
+            macros = load_funcdefs(FUNCTION_DIR)
+        except ValueError as exc:
+            macros = {}
+            errors.append(str(exc))
+        self.chart_data, self.calc_columns, formula_errors = apply_formulas(
+            self.data, formulas, self.header_row_count, macros
+        )
+        self.formula_errors = errors + formula_errors
+
+    def _add_data2_tab(self) -> None:
+        page = ttk.Frame(self.notebook, padding=10)
+        self.notebook.add(
+            page,
+            text="Data2",
+            image=self._make_tab_image("Data2"),
+            compound="center",
+        )
+        page.rowconfigure(1, weight=1)
+        page.columnconfigure(0, weight=1)
+        self.data2_info = tk.StringVar()
+        ttk.Label(page, textvariable=self.data2_info, wraplength=1100).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
+        columns = [str(self.chart_data.columns[0])] + list(self.calc_columns)
+        table = ttk.Treeview(page, columns=columns, show="headings")
+        ybar = ttk.Scrollbar(page, orient="vertical", command=table.yview)
+        xbar = ttk.Scrollbar(page, orient="horizontal", command=table.xview)
+        table.configure(yscrollcommand=ybar.set, xscrollcommand=xbar.set)
+        table.grid(row=1, column=0, sticky="nsew")
+        ybar.grid(row=1, column=1, sticky="ns")
+        xbar.grid(row=2, column=0, sticky="ew")
+        for column in columns:
+            table.heading(column, text=column)
+            table.column(column, width=max(120, min(220, len(column) * 9)), minwidth=80, stretch=False)
+        controls = ttk.Frame(page)
+        controls.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+        self.data2_page_label = tk.StringVar()
+        ttk.Button(controls, text="Vorige", command=lambda: self._change_data2_page(-1)).pack(side="left")
+        ttk.Label(controls, textvariable=self.data2_page_label).pack(side="left", padx=12)
+        ttk.Button(controls, text="Volgende", command=lambda: self._change_data2_page(1)).pack(side="left")
+        self.data2_table = table
+        self.data2_columns = columns
+        self._show_data2_page()
+        if self.formula_errors:
+            self.root.after(200, lambda: messagebox.showwarning(
+                "Formules", "Niet alle formules konden worden berekend:\n" + "\n".join(self.formula_errors),
+                parent=self.root))
+
+    def _show_data2_page(self) -> None:
+        table = self.data2_table
+        table.delete(*table.get_children())
+        start = self.header_row_count + self.data2_page * PAGE_SIZE
+        end = min(len(self.chart_data), start + PAGE_SIZE)
+        frame = self.chart_data.iloc[start:end][self.data2_columns]
+        for row in frame.itertuples(index=False, name=None):
+            values = []
+            for value in row:
+                if isinstance(value, float):
+                    value = "" if pd.isna(value) else f"{value:.6g}"
+                values.append(value)
+            table.insert("", "end", values=values)
+        count = len(self.chart_data) - self.header_row_count
+        total_pages = max(1, math.ceil(count / PAGE_SIZE))
+        self.data2_page_label.set(
+            f"Rijen {start - self.header_row_count + 1:,}-{end - self.header_row_count:,} van {count:,} | pagina {self.data2_page + 1} van {total_pages}"
+        )
+        errors = f" | {len(self.formula_errors)} fout(en): " + "; ".join(self.formula_errors) if self.formula_errors else ""
+        self.data2_info.set(
+            f"{len(self.calc_columns)} berekende kolom(men) uit de formules (Formule Editor){errors}"
+        )
+
+    def _change_data2_page(self, direction: int) -> None:
+        count = len(self.chart_data) - self.header_row_count
+        total_pages = max(1, math.ceil(count / PAGE_SIZE))
+        self.data2_page = max(0, min(total_pages - 1, self.data2_page + direction))
+        self._show_data2_page()
 
     def _clear_tabs(self) -> None:
         for tab in self.notebook.tabs():
@@ -445,6 +538,8 @@ class CampbellViewer:
         self._finish_cell_edit(save=True)
         if not self._data_changed:
             return
+        self._compute_calc()
+        self._show_data2_page()
         for canvas, axes_list, _is_wind_rose in self.chart_axes:
             self._restore_chart(canvas, axes_list)
             canvas.draw_idle()
@@ -808,6 +903,14 @@ class CampbellViewer:
         measurement_position = int(row_position) - self.header_row_count
         if measurement_position < 0:
             return
+        if column not in self.data.columns:
+            self.data2_page = measurement_position // PAGE_SIZE
+            self._show_data2_page()
+            self.notebook.select(self.notebook.tabs()[1])
+            item = self.data2_table.get_children()[measurement_position % PAGE_SIZE]
+            self.data2_table.selection_set(item)
+            self.data2_table.see(item)
+            return
         self.page = measurement_position // PAGE_SIZE
         self._show_page()
         self.notebook.select(self.notebook.tabs()[0])
@@ -937,12 +1040,12 @@ class CampbellViewer:
         axes.tick_params(colors="#344454", labelsize=9)
         axes.set_title(spec["name"], loc="left", fontsize=13, fontweight="bold", color="#1F2D3A", pad=14)
         if spec["type"] == "windroos":
-            restored_axes = [self._draw_wind_rose(figure, axes, spec, headers, self.data)]
+            restored_axes = [self._draw_wind_rose(figure, axes, spec, headers, self.chart_data)]
         elif spec["type"] == "scatter":
-            self._draw_scatter(axes, spec, headers, self.data)
+            self._draw_scatter(axes, spec, headers, self.chart_data)
             restored_axes = [axes]
         else:
-            restored_axes = self._draw_lines(figure, axes, spec, headers, self.data)
+            restored_axes = self._draw_lines(figure, axes, spec, headers, self.chart_data)
         axes_list[:] = restored_axes
 
     def _draw_lines(
@@ -1210,12 +1313,30 @@ class CampbellViewer:
         from logdef_editor import LogdefEditor
         editor = LogdefEditor(
             self.root,
-            [str(c) for c in self.data.columns],
+            [str(c) for c in self.chart_data.columns],
             self.logger,
             LOGDEF_DIR,
             location=self.location,
         )
         editor.iconbitmap(str(application_icon_path()))
+
+    def _open_formula_editor(self) -> None:
+        from formula_editor import FormulaEditor
+        editor = FormulaEditor(
+            self.root,
+            self.data,
+            self.header_row_count,
+            self.logger,
+            FORMULA_DIR,
+            location=self.location,
+            on_saved=self._reload_formulas,
+            function_dir=FUNCTION_DIR,
+        )
+        editor.iconbitmap(str(application_icon_path()))
+
+    def _reload_formulas(self) -> None:
+        self._populate_tabs()
+        self._last_selected_tab = self.notebook.select()
 
     def _open_help(self) -> None:
         try:
@@ -1300,6 +1421,7 @@ class CampbellViewer:
                     infrared = pd.to_numeric(data["IR_R_R_Avg"], errors="coerce")
                     data["Leaf T."] = (infrared / 0.0000000567) ** 0.25 - 273.16
             self.data, self.source, self.logger, self.location, self.page = data, source, logger, location, 0
+            self.data2_page = 0
             self._data_changed = False
             self.root.title(f"Campbell Sci | {source.name}")
             self.file_label.configure(text=source.name)

@@ -1,0 +1,4 @@
+# name;formula
+# Excel-achtige formules. Kolommen: [Kolomnaam]. Dagfuncties: DAGMIN, DAGMAX, DAGSOM, DAGGEM.
+Temp_02_m_MIN;DAGMIN([Temp_02_m_Avg])
+Temp_02_m_MAX;DAGMAX([Temp_02_m_Avg])
