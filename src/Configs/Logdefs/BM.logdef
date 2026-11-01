@@ -21,3 +21,7 @@ CMP6;line;TIMESTAMP,Solar_Rad_Avg;;;0.0;yellow
 VGL CNR1_CMP6;scatter;Solar_R_I_Avg,Solar_Rad_Avg;;;0.0;yellow
 Uren zon;line;TIMESTAMP,Sun_Hours_Tot;;;0.0;
 ETO;line;TIMESTAMP,ETo;;;0.0;
+IR_test;line;TIMESTAMP,IR_R_I_Avg,IR_R_R_Avg,IR_test@secondary;;;0.0;purple
+DagLengte;line;TIMESTAMP,DagLengte,Uren_Zon@secondary;;;0.0;yellow
+test;line;TIMESTAMP,test;;;0.0;
+int & diff test;line;TIMESTAMP,integ test,differ test@secondary;;;0.0;

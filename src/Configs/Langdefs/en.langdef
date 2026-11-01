@@ -1,0 +1,200 @@
+# Language definition: key=text. Use \n for a line break and {name} for placeholders.
+# Copy this file to <code>.langdef (e.g. fr.langdef) and translate the text right of '='.
+language.name=English
+
+# Errors
+err.bundled_configs_missing=Bundled configuration folder not found: {path}
+err.no_toa5_header=No Campbell TOA5 or TOACI1 header found in {name}
+err.no_data=No measurement data found in {name}
+err.invalid_logdef_line=Invalid configuration in {name}:{line}
+err.invalid_menudef_line=Invalid menu configuration in {name}:{line}
+err.column_not_in_data=Column '{name}' is not in the data.
+err.no_logger_name=Could not determine the logger name from {name}
+err.invalid_tab_color=Invalid tab color '{color}' for '{label}'.
+err.line_chart_needs_columns=A line chart requires a time column and at least one measurement column.
+err.height_empty=The column 'Hoogte' contains no values to split on.
+err.no_plottable_data=The configured columns contain no plottable data.
+err.scatter_needs_two=A scatter chart requires exactly two columns: Y and X.
+err.scatter_no_numeric=The scatter columns contain no numeric data points.
+err.no_wind_column=No wind direction column specified.
+err.no_wind_values=No numeric wind directions found.
+err.help_empty=The help text is empty: {path}
+err.app_id=Windows could not set the app identity (HRESULT 0x{code})
+err.config_dir=The configuration folder next to the program could not be created:\n{error}
+
+# Toolbar
+toolbar.open_data=Open Data
+toolbar.logdef_editor=LogDef Editor
+toolbar.formula_editor=Formula Editor
+toolbar.help=Help
+toolbar.auto_scale_y=Auto-scale Y axis when zooming
+toolbar.language=Language
+
+# Status
+status.rows_logger={rows} rows | logger {logger}
+status.cells_cleared={count} cell(s) cleared
+status.cell_changed=Cell changed: row {row}, column {column}
+status.saved=Saved: {name}
+
+# Tabs
+tab.charts=Charts
+tab.data=Data
+tab.calc=Calc
+
+# Buttons
+button.previous=Previous
+button.next=Next
+button.save=Save
+button.close=Close
+button.add=Add
+button.remove=Remove
+button.up=Up
+button.down=Down
+
+# Charts
+chart.no_numeric_columns=No numeric measurement columns to plot.
+chart.default_name=Chart {number}
+chart.cannot_build=Chart could not be built: {error}
+chart.skipped_columns=Skipped, not in this export: {columns}
+axis.primary=Primary axis
+axis.secondary=Secondary axis
+axis.time=Time
+axis.value=Value
+axis.percentage=Percentage
+hover.value=Value
+
+# Spreadsheets
+page.label=Rows {first}-{last} of {count} | page {page} of {pages}
+calc.formula_errors=Not all formulas could be calculated:
+calc.errors={count} error(s): {errors}
+calc.info={count} calculated column(s) from the formulas (Formula Editor){errors}
+msg.click_cell_first=First go to a point via the chart to mark the cell.
+file.edited_suffix=_edited
+
+# Dialogs
+dialog.formulas=Formulas
+dialog.save_data=Save modified data
+dialog.save_failed=Save failed
+dialog.help_unavailable=Help not available
+dialog.choose_dat=Choose a data file (.dat, .csv, .txt)
+filetype.data=Data files (dat, csv, txt)
+filetype.all=All files
+help.window_title=Campbell Sci - Help
+footer.author=Author: Eddy Smesman
+
+# Context menus
+menu.go_to_data=Go to Data
+menu.split=Split
+menu.same_axis=Same axis
+menu.rescale=Rescale
+menu.clear_range=Clear selected cells
+menu.return_to_chart=Back to chart
+
+# Logdef editor
+logdef.title_new=Create new .logdef
+logdef.title_edit=Edit logdef - {name}
+logdef.charts=Charts
+logdef.name=Name
+logdef.type=Type
+logdef.minimum=Minimum
+logdef.maximum=Maximum
+logdef.number_format=Number format
+logdef.tab_color=Tab color
+logdef.dat_columns=Columns in .dat
+logdef.primary=Primary >
+logdef.secondary=Secondary >
+logdef.unassign=< Remove
+logdef.load=Load .logdef...
+logdef.save_as=Save as .logdef...
+logdef.hint_time=Selected columns (time automatically becomes the x axis)
+logdef.hint_scatter=Selected columns (first = X, second = Y)
+logdef.hint_windrose=Selected column (1 direction column)
+logdef.open_title=Open .logdef
+logdef.no_charts=No charts found in this file.
+logdef.invalid_line=Invalid line {number} in {name}
+logdef.min_columns='{name}': choose at least {needed} column(s).
+logdef.choose_columns=Choose columns for at least one chart.
+logdef.save_title=Save as
+
+# Formula editor
+formula.title=Edit formulas
+formula.list_title=Formulas (order = calculation order)
+formula.new_column_name=New column name
+formula.formula=Formula
+formula.columns_title=Columns (double-click = insert)
+formula.functions_title=Functions (double-click = insert)
+formula.test=Test formula
+formula.edit_functions=Edit custom functions...
+formula.save_apply=Save and apply
+formula.own_functions=Custom functions
+formula.own_functions_title=Custom functions - {name}
+formula.default_name=Calculation {number}
+formula.error=Error: {error}
+formula.ok=OK: {count} values | min {min} | max {max} | mean {mean}
+formula.valid_no_values=Formula is valid, but no values were calculated.
+formula.unique_names=Every formula must have a unique name.
+
+# Formula errors
+ferr.invalid_formula=Invalid formula in {name}:{line}
+ferr.invalid_definition=Invalid definition in {source}:{line}
+ferr.builtin_name='{name}' is a built-in name ({source}:{line})
+ferr.own_constant={name} - custom constant
+ferr.own_function={name}({params}) - custom function
+ferr.column_missing=Column '{name}' does not exist.
+ferr.no_timestep=The time step of the data cannot be determined.
+ferr.min_one_arg=At least one argument required.
+ferr.min_two_args=At least two arguments required.
+ferr.expects_args={name} expects {count} argument(s).
+ferr.too_deep=Function call too deeply nested at {name} (recursion?).
+ferr.syntax_definition=Syntax error in definition of {name}.
+ferr.only_numbers=Only numbers are allowed as a constant.
+ferr.unsupported_comparison=Unsupported comparison.
+ferr.invalid_call=Invalid function call.
+ferr.constant_not_function='{name}' is a constant, not a function.
+ferr.unknown_function=Unknown function '{name}'.
+ferr.bad_arguments=Incorrect arguments for {name}.
+ferr.unsupported_syntax=Unsupported syntax in formula.
+ferr.empty_formula=Formula is empty.
+ferr.syntax_formula=Syntax error in formula.
+ferr.name_missing=Name is missing.
+ferr.name_exists=A column with this name already exists.
+
+# Function descriptions
+func.DAGMIN=DAGMIN([column]) - minimum per day
+func.DAGMAX=DAGMAX([column]) - maximum per day
+func.DAGSOM=DAGSOM([column]) - total per day
+func.DAGGEM=DAGGEM([column]) - mean per day
+func.SUM=SUM(a; b; ...) - sum per row
+func.SUBTRACT=SUBTRACT(a; b; ...) - subtract values per row
+func.PRODUCT=PRODUCT(a; b; ...) - multiply values per row
+func.DIVIDE=DIVIDE(a; b; ...) - divide values per row successively
+func.MIN=MIN(a; b; ...) - minimum per row
+func.MAX=MAX(a; b; ...) - maximum per row
+func.AVERAGE=AVERAGE(a; b; ...) - mean per row
+func.IF=IF(condition; then; else)
+func.AND=AND(a; b; ...)
+func.OR=OR(a; b; ...)
+func.NOT=NOT(a)
+func.ABS=ABS(x)
+func.SQRT=SQRT(x)
+func.ROUND=ROUND(x; decimals)
+func.INT=INT(x) - round down
+func.POWER=POWER(x; y) or x^y
+func.MOD=MOD(x; y)
+func.LN=LN(x)
+func.LOG10=LOG10(x)
+func.EXP=EXP(x)
+func.SIN=SIN(x) - radians
+func.COS=COS(x) - radians
+func.TAN=TAN(x) - radians
+func.RADIANS=RADIANS(degrees)
+func.DEGREES=DEGREES(radians)
+func.DIFF=DIFF(x) - difference with previous row
+func.ROLLAVG=ROLLAVG(x; n) - rolling mean over n rows
+func.STAP=STAP() - time step of the data in hours
+func.DERIVATIVE=DERIVATIVE(x; unit) - derivative per time unit: SEC, MIN, UUR or DAG (also S, H, D)
+func.INTEGRAL=INTEGRAL(x; unit) - running integral over time: SEC, MIN, UUR or DAG (also S, H, D)
+func.UUR=UUR() - time of the row as decimal hour (0-24)
+func.ZONOP=ZONOP(latitude; longitude; utc offset) - sunrise in decimal hours
+func.ZONONDER=ZONONDER(latitude; longitude; utc offset) - sunset in decimal hours
+funcdef.header=# Custom functions and constants (loaded for all loggers)\n# Constant:  NAME = value or formula\n# Function:  NAME(param1; param2) = formula   (parameters as [param1] or param1)\n

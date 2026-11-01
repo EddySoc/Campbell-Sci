@@ -34,6 +34,15 @@ def set_last_dir(directory: str | Path) -> None:
     _update("last_dir", str(directory))
 
 
+def get_language() -> str:
+    language = _load().get("language")
+    return language if isinstance(language, str) and language else "nl"
+
+
+def set_language(code: str) -> None:
+    _update("language", code)
+
+
 def get_auto_scale_y() -> bool:
     return bool(_load().get("auto_scale_y", False))
 

@@ -19,7 +19,8 @@ import pandas as pd
 from PIL import Image, ImageOps, ImageTk, UnidentifiedImageError
 from tkinter import font as tkfont
 from formulas import apply_formulas, load_formulas, load_funcdefs
-from settings import get_auto_scale_y, get_last_dir, set_auto_scale_y, set_last_dir
+from i18n import available_languages, current_language, init_language, set_language as apply_language, t
+from settings import get_auto_scale_y, get_last_dir, set_auto_scale_y, set_language, set_last_dir
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
@@ -41,6 +42,11 @@ HELPDEF_PATH = HELPDEF_DIR / "Campbell_Sci.helpdef"
 HELP_IMAGE_PATH = HELPDEF_DIR / "Meettoren.jpg"
 
 
+def helpdef_path() -> Path:
+    localized = HELPDEF_DIR / f"Campbell_Sci.{current_language()}.helpdef"
+    return localized if localized.is_file() else HELPDEF_PATH
+
+
 def application_icon_path() -> Path:
     if getattr(sys, "frozen", False):
         return Path(__file__).with_name("CampBell Icon.ico")
@@ -53,7 +59,7 @@ def prepare_external_configs() -> None:
 
     bundled_configs = Path(__file__).with_name("Configs")
     if not bundled_configs.is_dir():
-        raise FileNotFoundError(f"Gebundelde configuratiemap niet gevonden: {bundled_configs}")
+        raise FileNotFoundError(t("err.bundled_configs_missing", path=bundled_configs))
 
     CONFIGS_DIR.mkdir(parents=True, exist_ok=True)
     for source in bundled_configs.rglob("*"):
@@ -63,6 +69,45 @@ def prepare_external_configs() -> None:
         elif not destination.exists():
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination)
+
+
+def _read_generic_csv(path: Path, lines: list[str]) -> pd.DataFrame:
+    """Leest een gewone csv/txt-meetfile: eerste regel = kolomnamen, tijdkolom wordt vooraan gezet."""
+    from io import StringIO
+
+    lines = [line for line in lines if line.strip()]
+    if len(lines) < 2:
+        raise ValueError(t("err.no_data", name=path.name))
+    sample = "\n".join(lines[:50])
+    counts = {sep: lines[0].count(sep) for sep in (";", "\t", ",", "|")}
+    delimiter = max(counts, key=counts.get)
+    if counts[delimiter] == 0:
+        raise ValueError(t("err.no_toa5_header", name=path.name))
+    decimal = "," if delimiter != "," and re.search(r"\d,\d", sample) else "."
+    try:
+        data = pd.read_csv(
+            StringIO("\n".join(lines)), sep=delimiter, decimal=decimal, engine="python",
+            on_bad_lines="skip", header=0, na_values=["NAN", "NaN", "nan", "-", ""],
+        )
+    except (pd.errors.ParserError, pd.errors.EmptyDataError) as exc:
+        raise ValueError(t("err.no_data", name=path.name)) from exc
+    if data.empty:
+        raise ValueError(t("err.no_data", name=path.name))
+    data.columns = [str(column).strip() or f"Column{index + 1}" for index, column in enumerate(data.columns)]
+
+    for column in data.columns:
+        if pd.api.types.is_numeric_dtype(data[column]):
+            continue
+        text = data[column].astype(str)
+        dayfirst = bool(text.str.match(r"^\s*\d{1,2}[/.\-]\d{1,2}[/.\-]\d{4}").mean() > 0.5)
+        stamps = pd.to_datetime(text, format="mixed", dayfirst=dayfirst, errors="coerce")
+        if stamps.notna().mean() >= 0.5:
+            data[column] = stamps.dt.strftime("%Y-%m-%d %H:%M:%S")
+            data = data[[column] + [c for c in data.columns if c != column]]
+            break
+    data.attrs["header_row_count"] = 0
+    data.attrs["generic_csv"] = delimiter
+    return data
 
 
 def read_dat_file(file_path: str | Path) -> pd.DataFrame:
@@ -90,7 +135,7 @@ def read_dat_file(file_path: str | Path) -> pd.DataFrame:
         )
     header_index = toa5_header_index if toa5_header_index is not None else toaci1_header_index
     if header_index is None:
-        raise ValueError(f"Geen Campbell TOA5- of TOACI1-header gevonden in {path.name}")
+        return _read_generic_csv(path, lines)
     from io import StringIO
     data = pd.read_csv(
         StringIO("\n".join(lines[header_index:])),
@@ -101,7 +146,7 @@ def read_dat_file(file_path: str | Path) -> pd.DataFrame:
         header=0,
     )
     if data.empty:
-        raise ValueError(f"Geen meetgegevens gevonden in {path.name}")
+        raise ValueError(t("err.no_data", name=path.name))
     data.columns = [str(column).strip() for column in data.columns]
     data.attrs["header_row_count"] = HEADER_ROWS if toa5_header_index is not None else 0
     return data
@@ -156,7 +201,7 @@ def load_chart_config(
             continue
         fields = [field.strip() for field in line.split(";")]
         if len(fields) != 7:
-            raise ValueError(f"Ongeldige configuratie in {path.name}:{line_number}")
+            raise ValueError(t("err.invalid_logdef_line", name=path.name, line=line_number))
         name, chart_type, columns, minimum, maximum, number_format, tab_color = fields
         charts.append({
             "name": name,
@@ -181,9 +226,9 @@ def load_menu_config(name: str = "graph", menu_dir: str | Path = MENU_DIR) -> li
             continue
         fields = [field.strip() for field in line.split(";", 1)]
         if len(fields) != 2 or not all(fields):
-            raise ValueError(f"Ongeldige menuconfiguratie in {path.name}:{line_number}")
+            raise ValueError(t("err.invalid_menudef_line", name=path.name, line=line_number))
         label, action = fields
-        items.append({"label": label, "action": action})
+        items.append({"label": t(f"menu.{action}", default=label), "action": action})
     return items
 
 
@@ -199,7 +244,7 @@ def _resolve_header(headers: dict[str, str], configured: str) -> tuple[str, bool
     name = configured[:-10].strip() if secondary else configured.strip()
     column = headers.get(name.upper())
     if column is None:
-        raise ValueError(f"Kolom '{name}' staat niet in de data.")
+        raise ValueError(t("err.column_not_in_data", name=name))
     return column, secondary
 
 
@@ -227,7 +272,7 @@ def logger_and_location_from_filename(path: Path) -> tuple[str, str | None]:
     parts = path.stem.split("_")
     logger = parts[0].strip()
     if not logger:
-        raise ValueError(f"Kon geen loggernaam bepalen uit {path.name}")
+        raise ValueError(t("err.no_logger_name", name=path.name))
     location = parts[1].strip() if len(parts) > 1 else ""
     if not location or re.fullmatch(r"\d{4}(?:-?\d{2}){0,2}", location):
         location = None
@@ -246,6 +291,137 @@ def _x_values(series: pd.Series) -> tuple[pd.Series, bool]:
     if numbers.notna().sum() >= max(2, int(len(series) * 0.5)):
         return numbers, False
     return pd.Series(range(len(series)), index=series.index), False
+
+
+class ReadOnlyCellSelection:
+    """Excel-achtige celselectie (muis, Shift, pijltjes, Ctrl+C) op een Treeview."""
+
+    def __init__(self, table: ttk.Treeview, on_context_menu: Any = None):
+        self.table = table
+        self.cursor: tuple[str, str] | None = None
+        self.anchor: tuple[str, str] | None = None
+        self.labels: list[tk.Label] = []
+        self.on_context_menu = on_context_menu
+        table.bind("<Button-1>", self._click)
+        table.bind("<B1-Motion>", self._drag)
+        table.bind("<Key>", self._key)
+        table.bind("<Control-c>", self._copy)
+        table.bind("<Configure>", lambda _event: self.refresh())
+        self._yscroll = table.cget("yscrollcommand")
+        self._xscroll = table.cget("xscrollcommand")
+        table.configure(
+            yscrollcommand=lambda *args: (table.tk.call(self._yscroll, *args) if self._yscroll else None, self.refresh()),
+            xscrollcommand=lambda *args: (table.tk.call(self._xscroll, *args) if self._xscroll else None, self.refresh()),
+        )
+
+    def _cell_at(self, event: tk.Event) -> tuple[str, str] | None:
+        x = event.x_root - self.table.winfo_rootx()
+        y = event.y_root - self.table.winfo_rooty()
+        item = self.table.identify_row(y)
+        column_id = self.table.identify_column(x)
+        return (item, column_id) if item and column_id else None
+
+    def _click(self, event: tk.Event) -> str:
+        self.table.focus_set()
+        cell = self._cell_at(event)
+        if cell:
+            self.set_cursor(*cell, extend=bool(event.state & 0x1))
+        return "break"
+
+    def _drag(self, event: tk.Event) -> str:
+        cell = self._cell_at(event)
+        if cell and cell != self.cursor:
+            self.set_cursor(*cell, extend=True)
+        return "break"
+
+    def set_cursor(self, item: str | None, column_id: str | None = None, extend: bool = False) -> None:
+        self.cursor = (item, column_id) if item and column_id else None
+        if not extend or self.anchor is None or self.cursor is None:
+            self.anchor = self.cursor
+        self.refresh()
+
+    def bounds(self) -> tuple[int, int, int, int] | None:
+        if self.cursor is None or self.anchor is None:
+            return None
+        rows = sorted((self.table.index(self.anchor[0]), self.table.index(self.cursor[0])))
+        cols = sorted((int(self.anchor[1][1:]) - 1, int(self.cursor[1][1:]) - 1))
+        return rows[0], rows[1], cols[0], cols[1]
+
+    def refresh(self) -> None:
+        bounds = self.bounds()
+        cells: list[tuple[str, str, bool]] = []
+        if bounds:
+            row1, row2, col1, col2 = bounds
+            seen_visible = False
+            for item in self.table.get_children()[row1 : row2 + 1]:
+                if not self.table.bbox(item):
+                    if seen_visible:
+                        break
+                    continue
+                seen_visible = True
+                for col in range(col1, col2 + 1):
+                    column_id = f"#{col + 1}"
+                    if self.table.bbox(item, column_id):
+                        cells.append((item, column_id, (item, column_id) == self.cursor))
+        while len(self.labels) < len(cells):
+            self.labels.append(self._make_label())
+        for index, label in enumerate(self.labels):
+            if index >= len(cells):
+                label.place_forget()
+                continue
+            item, column_id, is_cursor = cells[index]
+            x, y, width, height = self.table.bbox(item, column_id)
+            label.configure(
+                text=self.table.set(item, column_id),
+                bg="#CFE3FF" if is_cursor else "#E3EEFC",
+                highlightthickness=2 if is_cursor else 1,
+            )
+            label.place(x=x, y=y, width=width, height=height)
+            label.lift()
+
+    def _make_label(self) -> tk.Label:
+        label = tk.Label(
+            self.table, anchor="w", bd=0, fg="#000000",
+            highlightbackground="#2F80ED", highlightcolor="#2F80ED",
+        )
+        label.bind("<Button-1>", self._click)
+        label.bind("<B1-Motion>", self._drag)
+        label.bind("<Control-c>", self._copy)
+        label.bind("<MouseWheel>", lambda event: self.table.yview_scroll(-1 if event.delta > 0 else 1, "units"))
+        if self.on_context_menu:
+            label.bind("<Button-3>", self.on_context_menu)
+        return label
+
+    def _move(self, d_row: int, d_col: int, extend: bool) -> None:
+        if self.cursor is None:
+            return
+        item, column_id = self.cursor
+        children = self.table.get_children()
+        columns = len(self.table["columns"])
+        row = max(0, min(len(children) - 1, self.table.index(item) + d_row))
+        col = max(0, min(columns - 1, int(column_id[1:]) - 1 + d_col))
+        self.set_cursor(children[row], f"#{col + 1}", extend=extend)
+        self.table.see(children[row])
+        self.table.update_idletasks()
+        self.refresh()
+
+    def _key(self, event: tk.Event) -> str | None:
+        moves = {"Up": (-1, 0), "Down": (1, 0), "Left": (0, -1), "Right": (0, 1)}
+        if event.keysym not in moves:
+            return None
+        self._move(*moves[event.keysym], extend=bool(event.state & 0x1))
+        return "break"
+
+    def _copy(self, _event: tk.Event | None = None) -> str:
+        bounds = self.bounds()
+        if bounds:
+            row1, row2, col1, col2 = bounds
+            lines = []
+            for item in self.table.get_children()[row1 : row2 + 1]:
+                lines.append("\t".join(self.table.set(item, f"#{col + 1}") for col in range(col1, col2 + 1)))
+            self.table.clipboard_clear()
+            self.table.clipboard_append("\n".join(lines))
+        return "break"
 
 
 class CampbellViewer:
@@ -352,24 +528,49 @@ class CampbellViewer:
     def _build_shell(self) -> None:
         toolbar = ttk.Frame(self.root, style="Toolbar.TFrame", padding=(14, 10))
         toolbar.pack(fill="x")
-        ttk.Button(toolbar, text="Open Data", command=self._choose_another_file).pack(side="left")
-        ttk.Button(toolbar, text="LogDef Editor", command=self._open_logdef_editor).pack(side="left", padx=(8, 0))
-        ttk.Button(toolbar, text="Formule Editor", command=self._open_formula_editor).pack(side="left", padx=(8, 0))
-        ttk.Button(toolbar, text="Help", command=self._open_help).pack(side="left", padx=(8, 0))
+        ttk.Button(toolbar, text=t("toolbar.open_data"), command=self._choose_another_file).pack(side="left")
+        ttk.Button(toolbar, text=t("toolbar.logdef_editor"), command=self._open_logdef_editor).pack(side="left", padx=(8, 0))
+        ttk.Button(toolbar, text=t("toolbar.formula_editor"), command=self._open_formula_editor).pack(side="left", padx=(8, 0))
+        ttk.Button(toolbar, text=t("toolbar.help"), command=self._open_help).pack(side="left", padx=(8, 0))
         self.auto_scale_y = tk.BooleanVar(value=get_auto_scale_y())
         ttk.Checkbutton(
-            toolbar, text="Y-as automatisch schalen bij zoomen", variable=self.auto_scale_y,
+            toolbar, text=t("toolbar.auto_scale_y"), variable=self.auto_scale_y,
             command=self._on_auto_scale_toggle,
         ).pack(side="left", padx=(14, 0))
         self.file_label = ttk.Label(toolbar, text=self.source.name, style="Toolbar.TLabel")
         self.file_label.pack(side="left", padx=(14, 0))
-        self.status = tk.StringVar(value=f"{len(self.data):,} rijen | logger {self.logger}")
+        languages = available_languages()
+        self._language_codes = list(languages)
+        language_box = ttk.Combobox(
+            toolbar, values=list(languages.values()), state="readonly", width=14,
+        )
+        language_box.set(languages.get(current_language(), current_language()))
+        language_box.bind("<<ComboboxSelected>>", lambda _event: self._change_language(language_box.current()))
+        language_box.pack(side="right", padx=(10, 0))
+        ttk.Label(toolbar, text=t("toolbar.language"), style="Toolbar.TLabel").pack(side="right", padx=(10, 4))
+        self.status = tk.StringVar(value=t("status.rows_logger", rows=f"{len(self.data):,}", logger=self.logger))
         ttk.Label(toolbar, textvariable=self.status, style="Toolbar.TLabel").pack(side="right")
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         footer = ttk.Frame(self.root, padding=(10, 3))
         footer.pack(fill="x", side="bottom")
-        ttk.Label(footer, text="Author: Eddy Smesman").pack(side="right")
+        ttk.Label(footer, text=t("footer.author")).pack(side="right")
+        self._shell_widgets = [toolbar, self.notebook, footer]
+
+    def _change_language(self, index: int) -> None:
+        code = self._language_codes[index]
+        if code == current_language():
+            return
+        self._finish_cell_edit(save=True)
+        apply_language(code)
+        set_language(code)
+        for widget in self._shell_widgets:
+            widget.destroy()
+        self._configure_window()
+        self._build_shell()
+        self._populate_tabs()
+        self._last_selected_tab = self.notebook.select()
+        self.notebook.bind("<<NotebookTabChanged>>", self._on_notebook_tab_changed)
 
     def _make_tab_image(self, label: str, color: str = "") -> tk.PhotoImage:
         font = tkfont.Font(root=self.root, family="Segoe UI", size=9)
@@ -380,7 +581,7 @@ class CampbellViewer:
             try:
                 red, green, blue = self.root.winfo_rgb(color)
             except tk.TclError as exc:
-                raise ValueError(f"Ongeldige tabkleur '{color}' voor '{label}'.") from exc
+                raise ValueError(t("err.invalid_tab_color", color=color, label=label)) from exc
             rgb = (red, green, blue)
             background = "#{:02x}{:02x}{:02x}".format(
                 *(round((channel / 65535) * 0.35 * 255 + 0.65 * 255) for channel in rgb)
@@ -401,18 +602,18 @@ class CampbellViewer:
             specs = _fallback_charts(self.chart_data)
         if not specs:
             empty = ttk.Frame(self.notebook, padding=24)
-            ttk.Label(empty, text="Geen numerieke meetkolommen om te tekenen.").pack(anchor="w")
+            ttk.Label(empty, text=t("chart.no_numeric_columns")).pack(anchor="w")
             self.notebook.add(
                 empty,
-                text="Grafieken",
-                image=self._make_tab_image("Grafieken"),
+                text=t("tab.charts"),
+                image=self._make_tab_image(t("tab.charts")),
                 compound="center",
             )
             return
         headers = _header_lookup(self.chart_data)
         used_names: set[str] = set()
         for index, spec in enumerate(specs):
-            name = spec["name"] or f"Grafiek {index + 1}"
+            name = spec["name"] or t("chart.default_name", number=index + 1)
             if name in used_names:
                 name = f"{name[:26]} ({index + 1})"
             used_names.add(name)
@@ -428,7 +629,7 @@ class CampbellViewer:
             try:
                 self._draw_chart(page, chart_spec, headers, self.chart_data)
             except (KeyError, ValueError) as exc:
-                ttk.Label(page, text=f"Grafiek kan niet worden opgebouwd: {exc}", padding=24).pack(anchor="w")
+                ttk.Label(page, text=t("chart.cannot_build", error=exc), padding=24).pack(anchor="w")
         if len(self.notebook.tabs()) > 2:
             self.notebook.select(self.notebook.tabs()[2])
 
@@ -453,8 +654,8 @@ class CampbellViewer:
         page = ttk.Frame(self.notebook, padding=10)
         self.notebook.add(
             page,
-            text="Data2",
-            image=self._make_tab_image("Data2"),
+            text=t("tab.calc"),
+            image=self._make_tab_image(t("tab.calc")),
             compound="center",
         )
         page.rowconfigure(1, weight=1)
@@ -462,7 +663,7 @@ class CampbellViewer:
         self.data2_info = tk.StringVar()
         ttk.Label(page, textvariable=self.data2_info, wraplength=1100).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
         columns = [str(self.chart_data.columns[0])] + list(self.calc_columns)
-        table = ttk.Treeview(page, columns=columns, show="headings")
+        table = ttk.Treeview(page, columns=columns, show="headings", selectmode="none")
         ybar = ttk.Scrollbar(page, orient="vertical", command=table.yview)
         xbar = ttk.Scrollbar(page, orient="horizontal", command=table.xview)
         table.configure(yscrollcommand=ybar.set, xscrollcommand=xbar.set)
@@ -475,19 +676,21 @@ class CampbellViewer:
         controls = ttk.Frame(page)
         controls.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(8, 0))
         self.data2_page_label = tk.StringVar()
-        ttk.Button(controls, text="Vorige", command=lambda: self._change_data2_page(-1)).pack(side="left")
+        ttk.Button(controls, text=t("button.previous"), command=lambda: self._change_data2_page(-1)).pack(side="left")
         ttk.Label(controls, textvariable=self.data2_page_label).pack(side="left", padx=12)
-        ttk.Button(controls, text="Volgende", command=lambda: self._change_data2_page(1)).pack(side="left")
+        ttk.Button(controls, text=t("button.next"), command=lambda: self._change_data2_page(1)).pack(side="left")
         self.data2_table = table
+        self.data2_selection = ReadOnlyCellSelection(table)
         self.data2_columns = columns
         self._show_data2_page()
         if self.formula_errors:
             self.root.after(200, lambda: messagebox.showwarning(
-                "Formules", "Niet alle formules konden worden berekend:\n" + "\n".join(self.formula_errors),
+                t("dialog.formulas"), t("calc.formula_errors") + "\n" + "\n".join(self.formula_errors),
                 parent=self.root))
 
     def _show_data2_page(self) -> None:
         table = self.data2_table
+        self.data2_selection.set_cursor(None)
         table.delete(*table.get_children())
         start = self.header_row_count + self.data2_page * PAGE_SIZE
         end = min(len(self.chart_data), start + PAGE_SIZE)
@@ -501,13 +704,12 @@ class CampbellViewer:
             table.insert("", "end", values=values)
         count = len(self.chart_data) - self.header_row_count
         total_pages = max(1, math.ceil(count / PAGE_SIZE))
-        self.data2_page_label.set(
-            f"Rijen {start - self.header_row_count + 1:,}-{end - self.header_row_count:,} van {count:,} | pagina {self.data2_page + 1} van {total_pages}"
-        )
-        errors = f" | {len(self.formula_errors)} fout(en): " + "; ".join(self.formula_errors) if self.formula_errors else ""
-        self.data2_info.set(
-            f"{len(self.calc_columns)} berekende kolom(men) uit de formules (Formule Editor){errors}"
-        )
+        self.data2_page_label.set(t(
+            "page.label", first=f"{start - self.header_row_count + 1:,}", last=f"{end - self.header_row_count:,}",
+            count=f"{count:,}", page=self.data2_page + 1, pages=total_pages,
+        ))
+        errors = " | " + t("calc.errors", count=len(self.formula_errors), errors="; ".join(self.formula_errors)) if self.formula_errors else ""
+        self.data2_info.set(t("calc.info", count=len(self.calc_columns), errors=errors))
 
     def _change_data2_page(self, direction: int) -> None:
         count = len(self.chart_data) - self.header_row_count
@@ -549,8 +751,8 @@ class CampbellViewer:
         page = ttk.Frame(self.notebook, padding=10)
         self.notebook.add(
             page,
-            text="Data",
-            image=self._make_tab_image("Data"),
+            text=t("tab.data"),
+            image=self._make_tab_image(t("tab.data")),
             compound="center",
         )
         page.rowconfigure(1, weight=1)
@@ -563,10 +765,13 @@ class CampbellViewer:
         frozen_table = ttk.Treeview(
             page, columns=columns, show="headings", height=self.header_row_count, selectmode="none"
         )
-        table = ttk.Treeview(page, columns=columns, show="")
+        table = ttk.Treeview(page, columns=columns, show="", selectmode="none")
         ybar = ttk.Scrollbar(page, orient="vertical", command=lambda *args: self._scroll_table(table, "y", *args))
         xbar = ttk.Scrollbar(page, orient="horizontal", command=lambda *args: self._scroll_table(table, "x", *args))
-        table.configure(yscrollcommand=ybar.set, xscrollcommand=lambda first, last: self._on_table_xscroll(xbar, frozen_table, first, last))
+        table.configure(
+            yscrollcommand=lambda first, last: (ybar.set(first, last), self._place_cursor()),
+            xscrollcommand=lambda first, last: (self._on_table_xscroll(xbar, frozen_table, first, last), self._place_cursor()),
+        )
         frozen_table.grid(row=0, column=0, sticky="ew")
         table.grid(row=1, column=0, sticky="nsew")
         ybar.grid(row=0, column=1, rowspan=2, sticky="ns")
@@ -584,18 +789,45 @@ class CampbellViewer:
         controls = ttk.Frame(page)
         controls.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(8, 0))
         self.page_label = tk.StringVar()
-        ttk.Button(controls, text="Vorige", command=lambda: self._change_page(-1)).pack(side="left")
+        ttk.Button(controls, text=t("button.previous"), command=lambda: self._change_page(-1)).pack(side="left")
         ttk.Label(controls, textvariable=self.page_label).pack(side="left", padx=12)
-        ttk.Button(controls, text="Volgende", command=lambda: self._change_page(1)).pack(side="left")
-        ttk.Button(controls, text="Opslaan", command=self._save_data).pack(side="right")
+        ttk.Button(controls, text=t("button.next"), command=lambda: self._change_page(1)).pack(side="left")
+        ttk.Button(controls, text=t("button.save"), command=self._save_data).pack(side="right")
         self.table = table
         self.frozen_table = frozen_table
         self._marked_column_id: str | None = None
         self._marked_column_index: int | None = None
+        self._cursor: tuple[str, str] | None = None
+        self._anchor: tuple[str, str] | None = None
+        self._cell_labels: list[tk.Label] = []
+        table.bind("<Button-1>", self._on_table_click)
+        table.bind("<B1-Motion>", self._on_table_drag)
         table.bind("<Double-1>", self._begin_cell_edit)
+        table.bind("<Key>", self._on_table_key)
         self._edit_entry: tk.Entry | None = None
         self._add_spreadsheet_menu(table)
         self._show_page()
+
+    def _make_cell_label(self, cursor: bool) -> tk.Label:
+        label = tk.Label(
+            self.table, anchor="w", bd=0, fg="#000000",
+            bg="#CFE3FF" if cursor else "#E3EEFC",
+            highlightthickness=2 if cursor else 1,
+            highlightbackground="#2F80ED", highlightcolor="#2F80ED",
+        )
+        label.bind("<Button-1>", self._on_table_click)
+        label.bind("<B1-Motion>", self._on_table_drag)
+        label.bind("<Double-1>", self._begin_cell_edit)
+        label.bind("<Button-3>", lambda event: self._show_spreadsheet_menu(event, self._spreadsheet_menu))
+        label.bind("<MouseWheel>", lambda event: self.table.yview_scroll(-1 if event.delta > 0 else 1, "units"))
+        return label
+
+    def _cell_at(self, event: tk.Event) -> tuple[str, str] | None:
+        x = event.x_root - self.table.winfo_rootx()
+        y = event.y_root - self.table.winfo_rooty()
+        item = self.table.identify_row(y)
+        column_id = self.table.identify_column(x)
+        return (item, column_id) if item and column_id else None
 
     def _on_table_xscroll(self, xbar: ttk.Scrollbar, frozen_table: ttk.Treeview, first: str, last: str) -> None:
         xbar.set(first, last)
@@ -610,47 +842,167 @@ class CampbellViewer:
         return self.header_row_count + self.page * PAGE_SIZE + self.table.index(item)
 
 
-    def _begin_cell_edit(self, event: tk.Event) -> None:
-        table = self.table
-        item = table.identify_row(event.y)
-        column_id = table.identify_column(event.x)
-        if not item or not column_id:
-            return
-        self._start_cell_edit(item, column_id)
+    def _begin_cell_edit(self, event: tk.Event) -> str:
+        cell = self._cell_at(event)
+        if cell:
+            self._set_cursor(*cell)
+            self._start_cell_edit(*cell)
+        return "break"
 
-    def _start_cell_edit(self, item: str, column_id: str) -> None:
-        table = self.table
-        if column_id != self._marked_column_id or item not in table.selection():
+    def _on_table_click(self, event: tk.Event) -> str:
+        self.table.focus_set()
+        self._finish_cell_edit(save=True)
+        cell = self._cell_at(event)
+        if cell:
+            self._set_cursor(*cell, extend=bool(event.state & 0x1))
+        return "break"
+
+    def _on_table_drag(self, event: tk.Event) -> str:
+        cell = self._cell_at(event)
+        if cell and cell != self._cursor:
+            self._set_cursor(*cell, extend=True)
+        return "break"
+
+    def _set_cursor(self, item: str | None, column_id: str | None = None, extend: bool = False) -> None:
+        self._cursor = (item, column_id) if item and column_id else None
+        if not extend or self._anchor is None or self._cursor is None:
+            self._anchor = self._cursor
+        self._place_cursor()
+
+    def _selection_bounds(self) -> tuple[int, int, int, int] | None:
+        if self._cursor is None or self._anchor is None:
+            return None
+        rows = sorted((self.table.index(self._anchor[0]), self.table.index(self._cursor[0])))
+        cols = sorted((int(self._anchor[1][1:]) - 1, int(self._cursor[1][1:]) - 1))
+        return rows[0], rows[1], cols[0], cols[1]
+
+    def _place_cursor(self) -> None:
+        bounds = self._selection_bounds()
+        cells: list[tuple[str, str, bool]] = []
+        if bounds:
+            row1, row2, col1, col2 = bounds
+            children = self.table.get_children()
+            first = self.table.identify_row(1)
+            start = max(row1, self.table.index(first)) if first else row1
+            for row in range(start, row2 + 1):
+                item = children[row]
+                if not self.table.bbox(item, "#1"):
+                    break
+                for col in range(col1, col2 + 1):
+                    column_id = f"#{col + 1}"
+                    if self.table.bbox(item, column_id):
+                        cells.append((item, column_id, (item, column_id) == self._cursor))
+        while len(self._cell_labels) < len(cells):
+            self._cell_labels.append(self._make_cell_label(cursor=False))
+        for index, label in enumerate(self._cell_labels):
+            if index >= len(cells):
+                label.place_forget()
+                continue
+            item, column_id, is_cursor = cells[index]
+            x, y, width, height = self.table.bbox(item, column_id)
+            label.configure(
+                text=self.table.set(item, column_id),
+                bg="#CFE3FF" if is_cursor else "#E3EEFC",
+                highlightthickness=2 if is_cursor else 1,
+            )
+            label.place(x=x, y=y, width=width, height=height)
+            label.lift()
+
+    def _move_cursor(self, d_row: int, d_col: int, extend: bool = False) -> None:
+        if self._cursor is None:
             return
+        item, column_id = self._cursor
+        children = self.table.get_children()
+        row = max(0, min(len(children) - 1, self.table.index(item) + d_row))
+        col = max(0, min(len(self.data.columns) - 1, int(column_id[1:]) - 1 + d_col))
+        item = children[row]
+        self._set_cursor(item, f"#{col + 1}", extend=extend)
+        self.table.see(item)
+        if not self.table.bbox(item, f"#{col + 1}"):
+            self._center_on_cell(item, col)
+            self._place_cursor()
+
+    def _on_table_key(self, event: tk.Event) -> str | None:
+        if self._edit_entry is not None:
+            return None
+        moves = {"Up": (-1, 0), "Down": (1, 0), "Left": (0, -1), "Right": (0, 1)}
+        if event.keysym in moves:
+            self._move_cursor(*moves[event.keysym], extend=bool(event.state & 0x1))
+        elif event.keysym in ("Return", "KP_Enter", "F2"):
+            self._edit_cursor_cell()
+        elif event.keysym == "Delete":
+            self._clear_cursor_cell()
+        elif event.char and event.char.isprintable() and not event.state & 0x4:
+            self._edit_cursor_cell(event.char)
+        else:
+            return None
+        return "break"
+
+    def _edit_cursor_cell(self, initial: str | None = None) -> None:
+        if self._cursor is not None:
+            self._set_cursor(*self._cursor)
+            self._start_cell_edit(*self._cursor, initial)
+
+    def _clear_cursor_cell(self) -> None:
+        bounds = self._selection_bounds()
+        if bounds is None:
+            return
+        row1, row2, col1, col2 = bounds
+        children = self.table.get_children()
+        first = self.header_row_count + self.page * PAGE_SIZE
+        self.data.iloc[first + row1 : first + row2 + 1, col1 : col2 + 1] = float("nan")
+        for item in children[row1 : row2 + 1]:
+            for col in range(col1, col2 + 1):
+                self.table.set(item, f"#{col + 1}", "")
+        self._data_changed = True
+        self._place_cursor()
+        self.status.set(t("status.cells_cleared", count=(row2 - row1 + 1) * (col2 - col1 + 1)))
+
+    def _start_cell_edit(self, item: str, column_id: str, initial: str | None = None) -> None:
+        table = self.table
         self._finish_cell_edit(save=True)
         box = table.bbox(item, column_id)
         if not box:
             return
         x, y, width, height = box
         column_index = int(column_id.replace("#", "")) - 1
-        current_value = table.set(item, column_id)
-        entry = tk.Entry(table)
-        entry.insert(0, current_value)
-        entry.select_range(0, "end")
+        entry = tk.Entry(table, highlightthickness=2, highlightbackground="#2F80ED", highlightcolor="#2F80ED")
+        if initial is None:
+            entry.insert(0, table.set(item, column_id))
+            entry.select_range(0, "end")
+        else:
+            entry.insert(0, initial)
         entry.place(x=x, y=y, width=width, height=height)
         entry.focus_set()
-        entry.bind("<Return>", lambda _event: self._finish_cell_edit(save=True))
-        entry.bind("<KP_Enter>", lambda _event: self._finish_cell_edit(save=True))
-        entry.bind("<Escape>", lambda _event: self._finish_cell_edit(save=False))
+        entry.bind("<Return>", lambda _event: self._commit_and_move_down())
+        entry.bind("<KP_Enter>", lambda _event: self._commit_and_move_down())
+        entry.bind("<Escape>", lambda _event: self._cancel_edit())
         entry.bind("<FocusOut>", lambda _event: self._finish_cell_edit(save=True))
         self._edit_entry = entry
         self._edit_target = (item, column_id, column_index)
+
+    def _commit_and_move_down(self) -> None:
+        self._finish_cell_edit(save=True)
+        self.table.focus_set()
+        self._move_cursor(1, 0)
+
+    def _cancel_edit(self) -> None:
+        self._finish_cell_edit(save=False)
+        self.table.focus_set()
 
     def _finish_cell_edit(self, save: bool) -> None:
         entry = self._edit_entry
         if entry is None:
             return
         self._edit_entry = None
-        item, column_id, column_index = self._edit_target
+        item, column_id, _column_index = self._edit_target
         new_text = entry.get()
         entry.destroy()
-        if not save:
-            return
+        if save:
+            self._store_cell_value(item, column_id, new_text)
+
+    def _store_cell_value(self, item: str, column_id: str, new_text: str) -> None:
+        column_index = int(column_id.replace("#", "")) - 1
         row_position = self._row_position(item)
         column = self.data.columns[column_index]
         stripped = new_text.strip()
@@ -664,24 +1016,29 @@ class CampbellViewer:
         self._data_changed = True
         display = "" if pd.isna(value) else str(value)
         self.table.set(item, column_id, display)
-        self.status.set(f"Cel aangepast: rij {row_position + 1}, kolom {column}")
+        self._place_cursor()
+        self.status.set(t("status.cell_changed", row=row_position + 1, column=column))
 
     def _save_data(self) -> None:
         original_extension = self.source.suffix or ".dat"
         target = filedialog.asksaveasfilename(
             parent=self.root,
-            title="Sla gewijzigde data op",
+            title=t("dialog.save_data"),
             initialdir=str(self.source.parent),
-            initialfile=f"{self.source.stem}_bewerkt{original_extension}",
+            initialfile=f"{self.source.stem}{t('file.edited_suffix')}{original_extension}",
             defaultextension=original_extension,
-            filetypes=[(f"Campbell data (*{original_extension})", f"*{original_extension}"), ("Alle bestanden", "*.*")],
+            filetypes=[(f"Data (*{original_extension})", f"*{original_extension}"), (t("filetype.all"), "*.*")],
         )
         if not target:
             return
         try:
-            preamble = _read_preamble_lines(self.source)
+            delimiter = self.data.attrs.get("generic_csv")
             with open(target, "w", encoding="utf-8", newline="") as handle:
-                for line in preamble:
+                if delimiter:
+                    self.data.to_csv(handle, sep=delimiter, index=False, lineterminator="\n")
+                    self.status.set(t("status.saved", name=Path(target).name))
+                    return
+                for line in _read_preamble_lines(self.source):
                     handle.write(line + "\n")
                 writer = csv.writer(handle, quoting=csv.QUOTE_NONNUMERIC)
                 writer.writerow(list(self.data.columns))
@@ -691,9 +1048,9 @@ class CampbellViewer:
                     writer.writerow([_format_toa5_cell(value, "") for value in row])
                 for row in data_rows.itertuples(index=False, name=None):
                     writer.writerow([_format_toa5_cell(value, "NAN") for value in row])
-            self.status.set(f"Opgeslagen: {Path(target).name}")
+            self.status.set(t("status.saved", name=Path(target).name))
         except Exception as exc:
-            messagebox.showerror("Opslaan mislukt", str(exc), parent=self.root)
+            messagebox.showerror(t("dialog.save_failed"), str(exc), parent=self.root)
 
 
 
@@ -710,6 +1067,7 @@ class CampbellViewer:
                 label=item["label"],
                 command=lambda action=item["action"]: self._run_spreadsheet_action(action),
             )
+        self._spreadsheet_menu = menu
         table.bind("<Button-3>", lambda event: self._show_spreadsheet_menu(event, menu))
 
     def _show_spreadsheet_menu(self, event: tk.Event, menu: tk.Menu) -> str:
@@ -728,38 +1086,14 @@ class CampbellViewer:
             self.notebook.select(self.notebook.tabs()[1])
 
     def _clear_marked_column_selection(self) -> None:
-        if self._marked_column_index is None or self._marked_column_id is None:
-            messagebox.showinfo(
-                "Campbell Sci",
-                "Ga eerst via de grafiek naar een punt om de kolom te markeren.",
-                parent=self.root,
-            )
+        if self._cursor is None:
+            messagebox.showinfo("Campbell Sci", t("msg.click_cell_first"), parent=self.root)
             return
-        selected_items = self.table.selection()
-        if not selected_items:
-            messagebox.showinfo(
-                "Campbell Sci",
-                "Selecteer eerst de rijen die u wilt wissen (klik en Shift-klik of Ctrl-klik).",
-                parent=self.root,
-            )
-            return
-        column = self.data.columns[self._marked_column_index]
-        confirmed = messagebox.askyesno(
-            "Campbell Sci",
-            f"{len(selected_items)} cel(len) wissen in gemarkeerde kolom '{column}'?",
-            parent=self.root,
-        )
-        if not confirmed:
-            return
-        for item in selected_items:
-            row_position = self._row_position(item)
-            self.data.iloc[row_position, self._marked_column_index] = float("nan")
-            self.table.set(item, self._marked_column_id, "")
-        self._data_changed = True
-        self.status.set(f"{len(selected_items)} cellen gewist in kolom {column}")
+        self._clear_cursor_cell()
 
 
     def _show_page(self) -> None:
+        self._set_cursor(None)
         self.table.delete(*self.table.get_children())
         measurement_count = len(self.data) - self.header_row_count
         start = self.header_row_count + self.page * PAGE_SIZE
@@ -768,9 +1102,10 @@ class CampbellViewer:
             values = ["" if pd.isna(value) else str(value) for value in row]
             self.table.insert("", "end", values=values)
         total_pages = max(1, math.ceil(measurement_count / PAGE_SIZE))
-        self.page_label.set(
-            f"Rijen {start - self.header_row_count + 1:,}-{end - self.header_row_count:,} van {measurement_count:,} | pagina {self.page + 1} van {total_pages}"
-        )
+        self.page_label.set(t(
+            "page.label", first=f"{start - self.header_row_count + 1:,}", last=f"{end - self.header_row_count:,}",
+            count=f"{measurement_count:,}", page=self.page + 1, pages=total_pages,
+        ))
 
     def _change_page(self, direction: int) -> None:
         measurement_count = len(self.data) - self.header_row_count
@@ -812,6 +1147,8 @@ class CampbellViewer:
         canvas_widget.pack(fill="both", expand=True, padx=10, pady=10)
         canvas.draw()
         canvas.mpl_connect("scroll_event", lambda event, target=canvas, chart_axes=axes_list, polar=is_wind_rose: self._on_scroll(event, target, chart_axes, polar))
+        canvas_widget.bind("<Motion>", lambda event, target=canvas, chart_axes=axes_list: self._on_chart_hover(event, target, chart_axes))
+        canvas_widget.bind("<Leave>", lambda _event: self._hide_hover_tip())
         canvas_widget.bind("<Button-3>", lambda event, target=canvas, chart_axes=axes_list: self._show_chart_menu(event, target, chart_axes))
         self._add_chart_menu(page, canvas, axes_list, spec, headers, is_wind_rose)
         self.figures.append(figure)
@@ -838,6 +1175,39 @@ class CampbellViewer:
         canvas._campbell_chart_headers = headers
         canvas._campbell_is_wind_rose = is_wind_rose
         canvas._campbell_data_target = None
+
+    def _on_chart_hover(self, event: tk.Event, canvas: FigureCanvasTkAgg, axes_list: list[Any]) -> None:
+        target = self._find_data_target(event, canvas, axes_list)
+        if target is None:
+            self._hide_hover_tip()
+            return
+        row_index, column = target
+        try:
+            position = self.chart_data.index.get_loc(row_index)
+            value = self.chart_data.iloc[position][column]
+            stamp = self.chart_data.iloc[position, 0]
+        except (KeyError, TypeError):
+            self._hide_hover_tip()
+            return
+        value_text = "" if pd.isna(value) else (f"{value:.6g}" if isinstance(value, float) else str(value))
+        text = f"{column}\n{stamp}\n{t('hover.value')}: {value_text}"
+        tip = getattr(self, "_hover_tip", None)
+        if tip is None:
+            tip = tk.Toplevel(self.root)
+            tip.wm_overrideredirect(True)
+            tip.attributes("-topmost", True)
+            label = tk.Label(tip, justify="left", background="#FFFFE1", relief="solid", borderwidth=1, padx=6, pady=3)
+            label.pack()
+            tip._label = label
+            self._hover_tip = tip
+        tip._label.configure(text=text)
+        tip.wm_geometry(f"+{event.x_root + 16}+{event.y_root + 16}")
+
+    def _hide_hover_tip(self) -> None:
+        tip = getattr(self, "_hover_tip", None)
+        if tip is not None:
+            tip.destroy()
+            self._hover_tip = None
 
     def _show_chart_menu(self, event: tk.Event, canvas: FigureCanvasTkAgg, axes_list: list[Any]) -> str:
         menu = getattr(canvas, "_campbell_context_menu", None)
@@ -908,17 +1278,18 @@ class CampbellViewer:
             self._show_data2_page()
             self.notebook.select(self.notebook.tabs()[1])
             item = self.data2_table.get_children()[measurement_position % PAGE_SIZE]
-            self.data2_table.selection_set(item)
+            self.data2_selection.set_cursor(item, f"#{self.data2_columns.index(column) + 1}") if column in self.data2_columns else self.data2_selection.set_cursor(item, "#1")
             self.data2_table.see(item)
+            self.data2_table.focus_set()
             return
         self.page = measurement_position // PAGE_SIZE
         self._show_page()
         self.notebook.select(self.notebook.tabs()[0])
         item = self.table.get_children()[measurement_position % PAGE_SIZE]
-        self.table.selection_set(item)
-        self.table.focus(item)
         column_index = list(self.data.columns).index(column)
         self._center_on_cell(item, column_index)
+        self._set_cursor(item, f"#{column_index + 1}")
+        self.table.focus_set()
         self._mark_column(column_index)
 
     def _center_on_cell(self, item: str, column_index: int) -> None:
@@ -974,7 +1345,7 @@ class CampbellViewer:
             new_axes.spines["top"].set_visible(False)
             new_axes.spines["right"].set_visible(False)
             new_axes.tick_params(colors="#344454", labelsize=9)
-            new_axes.set_ylabel(old_labels[index] or ("Primaire as" if index == 0 else "Secundaire as"))
+            new_axes.set_ylabel(old_labels[index] or (t("axis.primary") if index == 0 else t("axis.secondary")))
             new_handles = []
             for line in lines:
                 new_line, = new_axes.plot(
@@ -990,7 +1361,7 @@ class CampbellViewer:
                 new_handles.append(new_line)
             if new_handles:
                 new_axes.legend(handles=new_handles, loc="upper left", bbox_to_anchor=(0, 1.0), ncol=min(4, len(new_handles)), frameon=False, fontsize=8)
-        split_axes[-1].set_xlabel("Tijd")
+        split_axes[-1].set_xlabel(t("axis.time"))
         axes_list[:] = split_axes
 
     def _use_same_axis(self, canvas: FigureCanvasTkAgg, axes_list: list[Any]) -> None:
@@ -1019,7 +1390,7 @@ class CampbellViewer:
                 new_line._campbell_row_indices = line._campbell_row_indices
                 new_line._campbell_column = line._campbell_column
             new_handles.append(new_line)
-        target.set_xlabel("Tijd")
+        target.set_xlabel(t("axis.time"))
         target.relim()
         target.set_autoscale_on(True)
         target.autoscale(enable=True, axis="both", tight=False)
@@ -1058,7 +1429,7 @@ class CampbellViewer:
     ) -> list[Any]:
         columns = spec["columns"]
         if len(columns) < 2:
-            raise ValueError("Een lijngrafiek vereist een tijdkolom en minstens een meetkolom.")
+            raise ValueError(t("err.line_chart_needs_columns"))
         x_column, _ = _resolve_header(headers, columns[0])
         x_values, is_date = _x_values(data[x_column])
         height_column: str | None = None
@@ -1077,7 +1448,7 @@ class CampbellViewer:
                     .tolist()
                 )
                 if not height_values:
-                    raise ValueError("De kolom 'Hoogte' bevat geen waarden om op te splitsen.")
+                    raise ValueError(t("err.height_empty"))
                 break
 
         secondary_axes = None
@@ -1134,10 +1505,10 @@ class CampbellViewer:
                 legend_handles.append(line)
                 plotted += 1
         if not plotted:
-            raise ValueError("De geconfigureerde kolommen bevatten geen plotbare data.")
-        axes.set_ylabel("Waarde", color="#344454")
+            raise ValueError(t("err.no_plottable_data"))
+        axes.set_ylabel(t("axis.value"), color="#344454")
         if secondary_axes is not None:
-            secondary_axes.set_ylabel("Secundaire as", color="#344454")
+            secondary_axes.set_ylabel(t("axis.secondary"), color="#344454")
         minimum, maximum = spec["minimum"], spec["maximum"]
         if minimum is not None or maximum is not None:
             axes.set_ylim(bottom=minimum, top=maximum)
@@ -1150,7 +1521,7 @@ class CampbellViewer:
             axes.text(
                 0.01,
                 0.01,
-                f"Overgeslagen, niet in deze export: {', '.join(missing_columns)}",
+                t("chart.skipped_columns", columns=", ".join(missing_columns)),
                 transform=axes.transAxes,
                 fontsize=8,
                 color="#8A5A00",
@@ -1167,7 +1538,7 @@ class CampbellViewer:
         data: pd.DataFrame,
     ) -> None:
         if len(spec["columns"]) != 2:
-            raise ValueError("Een scattergrafiek vereist exact twee kolommen: Y en X.")
+            raise ValueError(t("err.scatter_needs_two"))
         y_column, _ = _resolve_header(headers, spec["columns"][0])
         x_column, _ = _resolve_header(headers, spec["columns"][1])
         x_values = pd.to_numeric(data[x_column], errors="coerce")
@@ -1180,7 +1551,7 @@ class CampbellViewer:
         axes.set_ylabel(y_column)
         axes.grid(True, color="#DCE2E8", linewidth=0.7)
         if not valid.any():
-            raise ValueError("De scatterkolommen bevatten geen numerieke datapunten.")
+            raise ValueError(t("err.scatter_no_numeric"))
 
     def _draw_wind_rose(
         self,
@@ -1191,11 +1562,11 @@ class CampbellViewer:
         data: pd.DataFrame,
     ) -> Any:
         if not spec["columns"]:
-            raise ValueError("Geen windrichtingskolom opgegeven.")
+            raise ValueError(t("err.no_wind_column"))
         column, _ = _resolve_header(headers, spec["columns"][0])
         directions = pd.to_numeric(data[column], errors="coerce").dropna().mod(360)
         if directions.empty:
-            raise ValueError("Geen numerieke windrichtingen gevonden.")
+            raise ValueError(t("err.no_wind_values"))
         bins = 16
         width = 360 / bins
         counts = [0] * bins
@@ -1212,7 +1583,7 @@ class CampbellViewer:
         polar_axes.set_xticks(angles)
         polar_axes.set_xticklabels(["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"])
         polar_axes.set_title(spec["name"], loc="left", fontsize=13, fontweight="bold", color="#1F2D3A", pad=22)
-        polar_axes.set_ylabel("Percentage", labelpad=28)
+        polar_axes.set_ylabel(t("axis.percentage"), labelpad=28)
         return polar_axes
 
     def _on_auto_scale_toggle(self) -> None:
@@ -1340,9 +1711,10 @@ class CampbellViewer:
 
     def _open_help(self) -> None:
         try:
-            help_text = HELPDEF_PATH.read_text(encoding="utf-8").strip()
+            help_file = helpdef_path()
+            help_text = help_file.read_text(encoding="utf-8").strip()
             if not help_text:
-                raise ValueError(f"De helptekst is leeg: {HELPDEF_PATH}")
+                raise ValueError(t("err.help_empty", path=help_file))
             with Image.open(HELP_IMAGE_PATH) as source_image:
                 help_image = ImageOps.contain(
                     source_image.convert("RGB"),
@@ -1350,11 +1722,11 @@ class CampbellViewer:
                     method=Image.Resampling.LANCZOS,
                 )
         except (OSError, UnidentifiedImageError, ValueError) as exc:
-            messagebox.showerror("Help niet beschikbaar", str(exc), parent=self.root)
+            messagebox.showerror(t("dialog.help_unavailable"), str(exc), parent=self.root)
             return
 
         window = tk.Toplevel(self.root)
-        window.title("Campbell Sci - Help")
+        window.title(t("help.window_title"))
         window.iconbitmap(str(application_icon_path()))
         window.geometry("1080x740")
         window.minsize(800, 560)
@@ -1398,13 +1770,13 @@ class CampbellViewer:
                 help_widget.insert("end", line + "\n")
         help_widget.configure(state="disabled")
 
-        ttk.Button(content, text="Sluiten", command=window.destroy).pack(side="bottom", anchor="e", pady=(12, 0))
+        ttk.Button(content, text=t("button.close"), command=window.destroy).pack(side="bottom", anchor="e", pady=(12, 0))
 
     def _choose_another_file(self) -> None:
         selected = filedialog.askopenfilename(
             parent=self.root,
-            title="Kies een Campbell .dat-bestand",
-            filetypes=[("Campbell data", "*.dat"), ("Alle bestanden", "*.*")],
+            title=t("dialog.choose_dat"),
+            filetypes=[(t("filetype.data"), "*.dat *.csv *.txt"), (t("filetype.all"), "*.*")],
             initialdir=get_last_dir(),
         )
         if not selected:
@@ -1425,7 +1797,7 @@ class CampbellViewer:
             self._data_changed = False
             self.root.title(f"Campbell Sci | {source.name}")
             self.file_label.configure(text=source.name)
-            self.status.set(f"{len(data):,} rijen | logger {logger}")
+            self.status.set(t("status.rows_logger", rows=f"{len(data):,}", logger=logger))
             self._populate_tabs()
             self._last_selected_tab = self.notebook.select()
         except Exception as exc:

@@ -4,8 +4,8 @@
 # Ingebouwd voor de zon: ZONOP(breedte; lengte; utc), ZONONDER(...), STAP(), UUR()
 
 # Locatie van de meettoren: pas aan! UTC = tijdverschil van de logger-tijd met UTC in uren.
-LAT = 52.1
-LON = 5.18
+LAT = 52.2912
+LON = 4.49182
 UTC = 1
 
 # Uren zonneschijn per dag: tijd waarop straling >= 120 W/m2 (WMO-drempel)

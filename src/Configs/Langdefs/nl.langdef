@@ -1,0 +1,200 @@
+# Taaldefinitie: sleutel=tekst. Gebruik \n voor een nieuwe regel en {naam} voor invulwaarden.
+# Kopieer dit bestand naar <code>.langdef (bv. fr.langdef) en vertaal de teksten rechts van '='.
+language.name=Nederlands
+
+# Fouten
+err.bundled_configs_missing=Gebundelde configuratiemap niet gevonden: {path}
+err.no_toa5_header=Geen Campbell TOA5- of TOACI1-header gevonden in {name}
+err.no_data=Geen meetgegevens gevonden in {name}
+err.invalid_logdef_line=Ongeldige configuratie in {name}:{line}
+err.invalid_menudef_line=Ongeldige menuconfiguratie in {name}:{line}
+err.column_not_in_data=Kolom '{name}' staat niet in de data.
+err.no_logger_name=Kon geen loggernaam bepalen uit {name}
+err.invalid_tab_color=Ongeldige tabkleur '{color}' voor '{label}'.
+err.line_chart_needs_columns=Een lijngrafiek vereist een tijdkolom en minstens een meetkolom.
+err.height_empty=De kolom 'Hoogte' bevat geen waarden om op te splitsen.
+err.no_plottable_data=De geconfigureerde kolommen bevatten geen plotbare data.
+err.scatter_needs_two=Een scattergrafiek vereist exact twee kolommen: Y en X.
+err.scatter_no_numeric=De scatterkolommen bevatten geen numerieke datapunten.
+err.no_wind_column=Geen windrichtingskolom opgegeven.
+err.no_wind_values=Geen numerieke windrichtingen gevonden.
+err.help_empty=De helptekst is leeg: {path}
+err.app_id=Windows kon de app-identiteit niet instellen (HRESULT 0x{code})
+err.config_dir=De configuratiemap naast het programma kon niet worden aangemaakt:\n{error}
+
+# Werkbalk
+toolbar.open_data=Open Data
+toolbar.logdef_editor=LogDef Editor
+toolbar.formula_editor=Formule Editor
+toolbar.help=Help
+toolbar.auto_scale_y=Y-as automatisch schalen bij zoomen
+toolbar.language=Taal
+
+# Status
+status.rows_logger={rows} rijen | logger {logger}
+status.cells_cleared={count} cel(len) gewist
+status.cell_changed=Cel aangepast: rij {row}, kolom {column}
+status.saved=Opgeslagen: {name}
+
+# Tabs
+tab.charts=Grafieken
+tab.data=Data
+tab.calc=Calc
+
+# Knoppen
+button.previous=Vorige
+button.next=Volgende
+button.save=Opslaan
+button.close=Sluiten
+button.add=Toevoegen
+button.remove=Verwijderen
+button.up=Omhoog
+button.down=Omlaag
+
+# Grafieken
+chart.no_numeric_columns=Geen numerieke meetkolommen om te tekenen.
+chart.default_name=Grafiek {number}
+chart.cannot_build=Grafiek kan niet worden opgebouwd: {error}
+chart.skipped_columns=Overgeslagen, niet in deze export: {columns}
+axis.primary=Primaire as
+axis.secondary=Secundaire as
+axis.time=Tijd
+axis.value=Waarde
+axis.percentage=Percentage
+hover.value=Waarde
+
+# Spreadsheets
+page.label=Rijen {first}-{last} van {count} | pagina {page} van {pages}
+calc.formula_errors=Niet alle formules konden worden berekend:
+calc.errors={count} fout(en): {errors}
+calc.info={count} berekende kolom(men) uit de formules (Formule Editor){errors}
+msg.click_cell_first=Ga eerst via de grafiek naar een punt om de cel te markeren.
+file.edited_suffix=_bewerkt
+
+# Dialogen
+dialog.formulas=Formules
+dialog.save_data=Sla gewijzigde data op
+dialog.save_failed=Opslaan mislukt
+dialog.help_unavailable=Help niet beschikbaar
+dialog.choose_dat=Kies een databestand (.dat, .csv, .txt)
+filetype.data=Databestanden (dat, csv, txt)
+filetype.all=Alle bestanden
+help.window_title=Campbell Sci - Help
+footer.author=Author: Eddy Smesman
+
+# Contextmenu's
+menu.go_to_data=Naar Data
+menu.split=Splitsen
+menu.same_axis=Zelfde as
+menu.rescale=Herschalen
+menu.clear_range=Geselecteerde cellen wissen
+menu.return_to_chart=Terug naar grafiek
+
+# Logdef editor
+logdef.title_new=Nieuwe .logdef maken
+logdef.title_edit=Logdef bewerken - {name}
+logdef.charts=Grafieken
+logdef.name=Naam
+logdef.type=Type
+logdef.minimum=Minimum
+logdef.maximum=Maximum
+logdef.number_format=Getalformaat
+logdef.tab_color=Tabkleur
+logdef.dat_columns=Kolommen in .dat
+logdef.primary=Primair >
+logdef.secondary=Secundair >
+logdef.unassign=< Verwijder
+logdef.load=Laad .logdef...
+logdef.save_as=Opslaan als .logdef...
+logdef.hint_time=Gekozen kolommen (tijd wordt automatisch x-as)
+logdef.hint_scatter=Gekozen kolommen (eerste = X, tweede = Y)
+logdef.hint_windrose=Gekozen kolom (1 richtingskolom)
+logdef.open_title=Open .logdef
+logdef.no_charts=Geen grafieken gevonden in dit bestand.
+logdef.invalid_line=Ongeldige regel {number} in {name}
+logdef.min_columns='{name}': kies minimaal {needed} kolom(men).
+logdef.choose_columns=Kies kolommen voor minstens één grafiek.
+logdef.save_title=Opslaan als
+
+# Formule editor
+formula.title=Formules bewerken
+formula.list_title=Formules (volgorde = rekenvolgorde)
+formula.new_column_name=Naam nieuwe kolom
+formula.formula=Formule
+formula.columns_title=Kolommen (dubbelklik = invoegen)
+formula.functions_title=Functies (dubbelklik = invoegen)
+formula.test=Test formule
+formula.edit_functions=Eigen functies bewerken...
+formula.save_apply=Opslaan en toepassen
+formula.own_functions=Eigen functies
+formula.own_functions_title=Eigen functies - {name}
+formula.default_name=Berekening {number}
+formula.error=Fout: {error}
+formula.ok=OK: {count} waarden | min {min} | max {max} | gemiddelde {mean}
+formula.valid_no_values=Formule geldig, maar er zijn geen waarden berekend.
+formula.unique_names=Elke formule moet een unieke naam hebben.
+
+# Formulefouten
+ferr.invalid_formula=Ongeldige formule in {name}:{line}
+ferr.invalid_definition=Ongeldige definitie in {source}:{line}
+ferr.builtin_name='{name}' is een ingebouwde naam ({source}:{line})
+ferr.own_constant={name} - eigen constante
+ferr.own_function={name}({params}) - eigen functie
+ferr.column_missing=Kolom '{name}' bestaat niet.
+ferr.no_timestep=De tijdstap van de data kan niet worden bepaald.
+ferr.min_one_arg=Minstens één argument nodig.
+ferr.min_two_args=Minstens twee argumenten nodig.
+ferr.expects_args={name} verwacht {count} argument(en).
+ferr.too_deep=Te diepe functie-aanroep bij {name} (recursie?).
+ferr.syntax_definition=Syntaxfout in definitie van {name}.
+ferr.only_numbers=Alleen getallen zijn toegestaan als constante.
+ferr.unsupported_comparison=Niet-ondersteunde vergelijking.
+ferr.invalid_call=Ongeldige functie-aanroep.
+ferr.constant_not_function='{name}' is een constante, geen functie.
+ferr.unknown_function=Onbekende functie '{name}'.
+ferr.bad_arguments=Onjuiste argumenten voor {name}.
+ferr.unsupported_syntax=Niet-ondersteunde syntax in formule.
+ferr.empty_formula=Formule is leeg.
+ferr.syntax_formula=Syntaxfout in formule.
+ferr.name_missing=Naam ontbreekt.
+ferr.name_exists=Er bestaat al een kolom met deze naam.
+
+# Functiebeschrijvingen
+func.DAGMIN=DAGMIN([kolom]) - minimum per dag
+func.DAGMAX=DAGMAX([kolom]) - maximum per dag
+func.DAGSOM=DAGSOM([kolom]) - totaal per dag
+func.DAGGEM=DAGGEM([kolom]) - gemiddelde per dag
+func.SUM=SUM(a; b; ...) - som per rij (SOM)
+func.SUBTRACT=SUBTRACT(a; b; ...) - trek waarden per rij van elkaar af (AFTREKKEN)
+func.PRODUCT=PRODUCT(a; b; ...) - vermenigvuldig waarden per rij (MULTIPLY)
+func.DIVIDE=DIVIDE(a; b; ...) - deel waarden per rij achtereenvolgens (DELEN)
+func.MIN=MIN(a; b; ...) - minimum per rij
+func.MAX=MAX(a; b; ...) - maximum per rij
+func.AVERAGE=AVERAGE(a; b; ...) - gemiddelde per rij (GEMIDDELDE)
+func.IF=IF(voorwaarde; dan; anders) (ALS)
+func.AND=AND(a; b; ...) (EN)
+func.OR=OR(a; b; ...) (OF)
+func.NOT=NOT(a) (NIET)
+func.ABS=ABS(x)
+func.SQRT=SQRT(x) (WORTEL)
+func.ROUND=ROUND(x; decimalen) (AFRONDEN)
+func.INT=INT(x) - naar beneden afronden (HELE)
+func.POWER=POWER(x; y) of x^y (MACHT)
+func.MOD=MOD(x; y) (REST)
+func.LN=LN(x)
+func.LOG10=LOG10(x)
+func.EXP=EXP(x)
+func.SIN=SIN(x) - radialen
+func.COS=COS(x) - radialen
+func.TAN=TAN(x) - radialen
+func.RADIANS=RADIANS(graden)
+func.DEGREES=DEGREES(radialen)
+func.DIFF=DIFF(x) - verschil met vorige rij (VERSCHIL)
+func.ROLLAVG=ROLLAVG(x; n) - voortschrijdend gemiddelde over n rijen (GLIJDEND)
+func.STAP=STAP() - tijdstap van de data in uren
+func.DERIVATIVE=DERIVATIVE(x; eenheid) - afgeleide per tijdseenheid: SEC, MIN, UUR of DAG (AFGELEIDE)
+func.INTEGRAL=INTEGRAL(x; eenheid) - lopende integraal over de tijd: SEC, MIN, UUR of DAG (INTEGRAAL)
+func.UUR=UUR() - tijdstip van de rij als decimaal uur (0-24)
+func.ZONOP=ZONOP(breedte; lengte; utc-verschil) - zonsopkomst in decimaal uur
+func.ZONONDER=ZONONDER(breedte; lengte; utc-verschil) - zonsondergang in decimaal uur
+funcdef.header=# Eigen functies en constanten (worden voor alle loggers geladen)\n# Constante:  NAAM = waarde of formule\n# Functie:    NAAM(param1; param2) = formule   (parameters als [param1] of param1)\n

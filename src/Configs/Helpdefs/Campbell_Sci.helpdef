@@ -1,7 +1,7 @@
 # Campbell Sci Viewer
 
 ## Een databestand openen
-Gebruik Open Data om een Campbell .dat-bestand te openen. TOA5- en TOACI1-bestanden worden ondersteund. De viewer kiest de grafiekconfiguratie op basis van de loggernaam en, indien aanwezig, de locatiecode.
+Gebruik Open Data om een Campbell .dat-bestand (TOA5 en TOACI1) of een gewoon .csv/.txt-meetbestand te openen. Bij gewone bestanden moet de eerste regel de kolomnamen bevatten; het scheidingsteken (komma, puntkomma, tab) en de decimale komma worden automatisch herkend en de kolom met datum/tijd wordt de tijdas. Er komt een grafiek per numerieke kolom; stel met de LogDef Editor en een `<begin van de bestandsnaam>.logdef` eigen grafieken samen. De viewer kiest de grafiekconfiguratie op basis van de loggernaam (begin van de bestandsnaam) en, indien aanwezig, de locatiecode.
 
 ## Grafieken bekijken
 De Data-tab toont de ingelezen meetwaarden. De andere tabs tonen grafieken uit de bijbehorende .logdef-configuratie. Tabkleuren helpen grafieken per onderwerp te herkennen, bijvoorbeeld geel voor zon en blauw voor neerslag.
@@ -20,7 +20,7 @@ Gebruik het muiswiel boven de grafiek om horizontaal in of uit te zoomen. Plaats
 Open Formule Editor om berekende kolommen aan de meetdata toe te voegen. Geef iedere berekening een naam en schrijf de formule in het formuleveld. Met Test formule controleer je de formule; Opslaan en toepassen berekent de kolom en voegt die toe aan de data.
 
 ### Formules schrijven
-Verwijs naar een bestaande kolom met de kolomnaam tussen vierkante haken, bijvoorbeeld `[Temp_02_m_Avg] * 1.8 + 32`. De kolommenlijst voegt een geselecteerde kolom in; dubbelklik of gebruik Kolom invoegen.
+Verwijs naar een bestaande kolom met de kolomnaam tussen vierkante haken, bijvoorbeeld `[Temp_02_m_Avg] * 1.8 + 32`. Dubbelklik op een kolom in de kolommenlijst om die in te voegen. Alle kolommen van de Data- en Calc-sheet zijn altijd beschikbaar.
 Gebruik puntnotatie voor decimalen. De editor voegt een functie als `FUNCTIE()` in met de cursor tussen de haakjes. Een gekozen kolom wordt op de cursorpositie ingevoegd, gevolgd door een komma; een overbodige komma aan het einde wordt bij bevestigen verwijderd. Functieargumenten mogen met komma's of puntkomma's worden gescheiden. Voorbeelden:
 - `[Temp_02_m_Avg] - [Temp_02_m_Min]`
 - `IF([Regen] > 0; 1; 0)`
@@ -38,6 +38,7 @@ In de data is een rij één meetmoment en een kolom één meetgrootheid. Argumen
 - Rekenen: `ABS(x)`, `SQRT(x)`, `ROUND(x; decimalen)`, `INT(x)`, `POWER(x; y)`, `MOD(x; y)`, `LN(x)`, `LOG10(x)` en `EXP(x)`.
 - Trigonometrie: `SIN(x)`, `COS(x)` en `TAN(x)` verwachten radialen. Gebruik `RADIANS(graden)` of `DEGREES(radialen)` om om te rekenen.
 - Tijdreeksen: `DIFF(x)` geeft voor één kolom het verschil met de vorige meetrij; `ROLLAVG(x; n)` geeft voor één kolom het voortschrijdend gemiddelde over n opeenvolgende meetrijen.
+- Differentiaal en integraal: `DERIVATIVE(x; eenheid)` (AFGELEIDE) geeft de verandering van x per tijdseenheid; `INTEGRAL(x; eenheid)` (INTEGRAAL) geeft de lopende integraal over de tijd (trapeziumregel, ontbrekende waarden tellen als 0). De eenheid is `SEC`, `MIN`, `UUR` of `DAG` (ook `S`, `H`, `D`) en wordt zonder aanhalingstekens geschreven; zonder eenheid wordt uur gebruikt. Bijvoorbeeld `INTEGRAL([Straling]; UUR)`.
 - Tijd en zon: `STAP()` geeft de tijdstap in uren, `UUR()` de tijd van de meetrij als decimaal uur, en `ZONOP(breedte; lengte; utc)` en `ZONONDER(breedte; lengte; utc)` de zonsopkomst en zonsondergang als decimaal uur. `utc` is het verschil tussen logger-tijd en UTC in uren.
 
 Nederlandse aliassen zijn beschikbaar: `SOM` (SUM), `AFTREKKEN` (SUBTRACT), `VERMENIGVULDIGEN` (PRODUCT), `DELEN` (DIVIDE), `GEMIDDELDE` (AVERAGE), `ALS` (IF), `EN` (AND), `OF` (OR), `NIET` (NOT), `WORTEL` (SQRT), `AFRONDEN` (ROUND), `MACHT` (POWER), `REST` (MOD), `HELE` (INT), `VERSCHIL` (DIFF) en `GLIJDEND` (ROLLAVG). De dagfuncties hebben ook de Engelse aliassen `DAYMIN`, `DAYMAX`, `DAYSUM`, `DAYAVG` en `DAYAVERAGE`.
@@ -50,6 +51,9 @@ De knop Eigen functies bewerken... opent `Configs/Functiedefs/Functies.funcdef`.
 `NAAR_CELSIUS(f) = (f - 32) / FACTOR`
 
 Dubbelklik op een functie in de functielijst om die met haakjes in te voegen; de cursor staat tussen de haakjes. Eigen constanten worden zonder haakjes ingevoegd. Eigen functies kunnen ingebouwde functies en constanten gebruiken. Namen van ingebouwde functies en constanten kunnen niet opnieuw worden gedefinieerd.
+
+## Taal
+Kies de taal met de keuzelijst rechts in de werkbalk; de keuze wordt bewaard. Taalbestanden staan in Configs/Langdefs (`<code>.langdef`). Voor een extra taal kopieer je `nl.langdef` naar een nieuw bestand zoals `fr.langdef`, stel je `language.name` in en vertaal je de teksten. Een vertaalde helptekst kan `Campbell_Sci.<code>.helpdef` heten in Configs/Helpdefs. Namen van functies en grafieken in je eigen configuratiebestanden worden niet vertaald.
 
 ## Context menus
 De context menus kunnen verkregen worden door het rechts klikken met de muis in de data tab of een grafiek tab.

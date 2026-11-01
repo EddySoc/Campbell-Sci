@@ -8,6 +8,7 @@ from tkinter import filedialog, messagebox
 
 import pandas as pd
 
+from i18n import init_language, t
 from settings import get_last_dir, set_last_dir
 from viewer import CampbellViewer, logger_from_filename, prepare_external_configs, read_dat_file
 
@@ -21,14 +22,14 @@ def set_windows_app_user_model_id() -> None:
     set_app_id.restype = ctypes.c_long
     result = set_app_id("EddySoc.CampbellSciViewer.2")
     if result < 0:
-        raise OSError(f"Windows kon de app-identiteit niet instellen (HRESULT 0x{result & 0xFFFFFFFF:08X})")
+        raise OSError(t("err.app_id", code=f"{result & 0xFFFFFFFF:08X}"))
 
 
 def choose_dat_file(parent: tk.Misc | None = None) -> str:
     return filedialog.askopenfilename(
         parent=parent,
-        title="Kies een Campbell .dat-bestand",
-        filetypes=[("Campbell data", "*.dat"), ("Alle bestanden", "*.*")],
+        title=t("dialog.choose_dat"),
+        filetypes=[(t("filetype.data"), "*.dat *.csv *.txt"), (t("filetype.all"), "*.*")],
         initialdir=get_last_dir(),
     )
 
@@ -41,9 +42,10 @@ def main() -> None:
     except OSError as exc:
         messagebox.showerror(
             "Campbell Sci",
-            f"De configuratiemap naast het programma kon niet worden aangemaakt:\n{exc}",
+            t("err.config_dir", error=exc),
         )
         return
+    init_language()
 
     chooser = tk.Tk()
     chooser.withdraw()

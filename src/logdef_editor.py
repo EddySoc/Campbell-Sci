@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from formulas import backup_original
+from i18n import t
 
 CHART_TYPES = ["line", "bar", "scatter", "windroos"]
 COLORS = ["", "red", "blue", "cyan", "yellow", "green", "orange", "purple", "gray", "black"]
@@ -16,7 +17,7 @@ HEADER = (
 
 
 def new_chart(index: int) -> dict:
-    return {"name": f"Grafiek {index}", "type": "line", "columns": [], "minimum": "", "maximum": "", "format": "0.0", "color": ""}
+    return {"name": t("chart.default_name", number=index), "type": "line", "columns": [], "minimum": "", "maximum": "", "format": "0.0", "color": ""}
 
 
 def chart_to_line(chart: dict, time_column: str) -> str:
@@ -38,7 +39,7 @@ class LogdefEditor(tk.Toplevel):
         location: str | None = None,
     ):
         super().__init__(parent)
-        self.title("Nieuwe .logdef maken")
+        self.title(t("logdef.title_new"))
         self.geometry("980x600")
         self.headers = headers
         self.time_column = headers[0] if headers else "TIMESTAMP"
@@ -52,7 +53,7 @@ class LogdefEditor(tk.Toplevel):
         charts = self._read_charts(self.loaded_path) if self.loaded_path else None
         if charts:
             self._set_charts(charts)
-            self.title(f"Logdef bewerken - {self.loaded_path.name}")
+            self.title(t("logdef.title_edit", name=self.loaded_path.name))
         else:
             self._add_chart()
 
@@ -68,12 +69,12 @@ class LogdefEditor(tk.Toplevel):
     def _build(self) -> None:
         left = ttk.Frame(self, padding=8)
         left.pack(side="left", fill="y")
-        ttk.Label(left, text="Grafieken").pack(anchor="w")
+        ttk.Label(left, text=t("logdef.charts")).pack(anchor="w")
         self.chart_list = tk.Listbox(left, width=24, exportselection=False)
         self.chart_list.pack(fill="y", expand=True)
         self.chart_list.bind("<<ListboxSelect>>", self._on_select)
-        for text, command in [("Toevoegen", self._add_chart), ("Verwijderen", self._remove_chart),
-                              ("Omhoog", lambda: self._move(-1)), ("Omlaag", lambda: self._move(1))]:
+        for text, command in [(t("button.add"), self._add_chart), (t("button.remove"), self._remove_chart),
+                              (t("button.up"), lambda: self._move(-1)), (t("button.down"), lambda: self._move(1))]:
             ttk.Button(left, text=text, command=command).pack(fill="x", pady=1)
 
         right = ttk.Frame(self, padding=8)
@@ -86,12 +87,12 @@ class LogdefEditor(tk.Toplevel):
         self.max_var = tk.StringVar()
         self.format_var = tk.StringVar(value="0.0")
         self.color_var = tk.StringVar()
-        rows = [("Naam", ttk.Entry(form, textvariable=self.name_var)),
-                ("Type", ttk.Combobox(form, textvariable=self.type_var, values=CHART_TYPES, state="readonly")),
-                ("Minimum", ttk.Entry(form, textvariable=self.min_var)),
-                ("Maximum", ttk.Entry(form, textvariable=self.max_var)),
-                ("Getalformaat", ttk.Entry(form, textvariable=self.format_var)),
-                ("Tabkleur", ttk.Combobox(form, textvariable=self.color_var, values=COLORS))]
+        rows = [(t("logdef.name"), ttk.Entry(form, textvariable=self.name_var)),
+                (t("logdef.type"), ttk.Combobox(form, textvariable=self.type_var, values=CHART_TYPES, state="readonly")),
+                (t("logdef.minimum"), ttk.Entry(form, textvariable=self.min_var)),
+                (t("logdef.maximum"), ttk.Entry(form, textvariable=self.max_var)),
+                (t("logdef.number_format"), ttk.Entry(form, textvariable=self.format_var)),
+                (t("logdef.tab_color"), ttk.Combobox(form, textvariable=self.color_var, values=COLORS))]
         for row, (label, widget) in enumerate(rows):
             ttk.Label(form, text=label).grid(row=row, column=0, sticky="w", pady=2)
             widget.grid(row=row, column=1, sticky="ew", padx=6, pady=2)
@@ -102,7 +103,7 @@ class LogdefEditor(tk.Toplevel):
         pick.pack(fill="both", expand=True, pady=(10, 0))
         avail = ttk.Frame(pick)
         avail.pack(side="left", fill="both", expand=True)
-        ttk.Label(avail, text="Kolommen in .dat").pack(anchor="w")
+        ttk.Label(avail, text=t("logdef.dat_columns")).pack(anchor="w")
         self.available = tk.Listbox(avail, selectmode="extended", exportselection=False)
         self.available.pack(fill="both", expand=True)
         for header in self.headers:
@@ -110,9 +111,9 @@ class LogdefEditor(tk.Toplevel):
 
         buttons = ttk.Frame(pick, padding=6)
         buttons.pack(side="left")
-        ttk.Button(buttons, text="Primair >", command=lambda: self._assign(False)).pack(fill="x", pady=2)
-        ttk.Button(buttons, text="Secundair >", command=lambda: self._assign(True)).pack(fill="x", pady=2)
-        ttk.Button(buttons, text="< Verwijder", command=self._unassign).pack(fill="x", pady=2)
+        ttk.Button(buttons, text=t("logdef.primary"), command=lambda: self._assign(False)).pack(fill="x", pady=2)
+        ttk.Button(buttons, text=t("logdef.secondary"), command=lambda: self._assign(True)).pack(fill="x", pady=2)
+        ttk.Button(buttons, text=t("logdef.unassign"), command=self._unassign).pack(fill="x", pady=2)
 
         chosen = ttk.Frame(pick)
         chosen.pack(side="left", fill="both", expand=True)
@@ -123,23 +124,23 @@ class LogdefEditor(tk.Toplevel):
 
         bottom = ttk.Frame(right)
         bottom.pack(fill="x", pady=(10, 0))
-        ttk.Button(bottom, text="Laad .logdef...", command=self._open).pack(side="left")
-        ttk.Button(bottom, text="Opslaan als .logdef...", command=self._save).pack(side="right")
+        ttk.Button(bottom, text=t("logdef.load"), command=self._open).pack(side="left")
+        ttk.Button(bottom, text=t("logdef.save_as"), command=self._save).pack(side="right")
 
     def _update_hint(self) -> None:
         kind = self.type_var.get()
-        self.hint.set({
-            "line": "Gekozen kolommen (tijd wordt automatisch x-as)",
-            "bar": "Gekozen kolommen (tijd wordt automatisch x-as)",
-            "scatter": "Gekozen kolommen (eerste = X, tweede = Y)",
-            "windroos": "Gekozen kolom (1 richtingskolom)",
-        }[kind])
+        self.hint.set(t({
+            "line": "logdef.hint_time",
+            "bar": "logdef.hint_time",
+            "scatter": "logdef.hint_scatter",
+            "windroos": "logdef.hint_windrose",
+        }[kind]))
 
     def _commit(self) -> None:
         if self.current is None:
             return
         chart = self.charts[self.current]
-        chart.update(name=self.name_var.get().strip() or f"Grafiek {self.current + 1}", type=self.type_var.get(),
+        chart.update(name=self.name_var.get().strip() or t("chart.default_name", number=self.current + 1), type=self.type_var.get(),
                      minimum=self.min_var.get().strip(), maximum=self.max_var.get().strip(),
                      format=self.format_var.get().strip(), color=self.color_var.get().strip(),
                      columns=list(self.selected.get(0, "end")))
@@ -218,7 +219,7 @@ class LogdefEditor(tk.Toplevel):
     def _open(self) -> None:
         config_name = f"{self.logger}_{self.location}" if self.location else self.logger
         path = filedialog.askopenfilename(
-            parent=self, title="Open .logdef", initialdir=self.config_dir,
+            parent=self, title=t("logdef.open_title"), initialdir=self.config_dir,
             initialfile=f"{config_name}.logdef", filetypes=[("Logdef", "*.logdef")])
         if not path:
             return
@@ -226,7 +227,7 @@ class LogdefEditor(tk.Toplevel):
         if charts is None:
             return
         if not charts:
-            messagebox.showwarning("Logdef", "Geen grafieken gevonden in dit bestand.", parent=self)
+            messagebox.showwarning("Logdef", t("logdef.no_charts"), parent=self)
             return
         self.loaded_path = Path(path)
         self._set_charts(charts)
@@ -239,7 +240,7 @@ class LogdefEditor(tk.Toplevel):
                 continue
             fields = [f.strip() for f in line.split(";")]
             if len(fields) != 7:
-                messagebox.showerror("Logdef", f"Ongeldige regel {number} in {path.name}", parent=self)
+                messagebox.showerror("Logdef", t("logdef.invalid_line", number=number, name=path.name), parent=self)
                 return None
             name, kind, columns, minimum, maximum, fmt, color = fields
             cols = [c.strip() for c in columns.split(",") if c.strip()]
@@ -267,21 +268,21 @@ class LogdefEditor(tk.Toplevel):
                 continue
             needed = 2 if chart["type"] == "scatter" else 1
             if len(chart["columns"]) < needed:
-                problems.append(f"'{chart['name']}': kies minimaal {needed} kolom(men).")
+                problems.append(t("logdef.min_columns", name=chart["name"], needed=needed))
             charts.append(chart)
         if problems:
             messagebox.showwarning("Logdef", "\n".join(problems), parent=self)
             return
         if not charts:
-            messagebox.showwarning("Logdef", "Kies kolommen voor minstens één grafiek.", parent=self)
+            messagebox.showwarning("Logdef", t("logdef.choose_columns"), parent=self)
             return
         config_name = self.loaded_path.stem if self.loaded_path else (f"{self.logger}_{self.location}" if self.location else self.logger)
         path = filedialog.asksaveasfilename(
-            parent=self, title="Opslaan als", defaultextension=".logdef", initialdir=self.config_dir,
+            parent=self, title=t("logdef.save_title"), defaultextension=".logdef", initialdir=self.config_dir,
             initialfile=f"{config_name}.logdef", filetypes=[("Logdef", "*.logdef")])
         if not path:
             return
         lines = [chart_to_line(chart, self.time_column) for chart in charts]
         backup_original(path)
         Path(path).write_text(HEADER + "\n".join(lines) + "\n", encoding="utf-8")
-        messagebox.showinfo("Logdef", f"Opgeslagen: {path}", parent=self)
+        messagebox.showinfo("Logdef", t("status.saved", name=path), parent=self)

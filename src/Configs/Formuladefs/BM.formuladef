@@ -2,3 +2,10 @@
 # Excel-achtige formules. Kolommen: [Kolomnaam]. Dagfuncties: DAGMIN, DAGMAX, DAGSOM, DAGGEM.
 Temp_02_m_MIN;DAGMIN([Temp_02_m_Avg])
 Temp_02_m_MAX;DAGMAX([Temp_02_m_Avg])
+Uren_Zon;ZONUREN([Solar_Rad_Avg])
+DagLengte;DAGLENGTE()
+somtest;SUM([Temp_02_m_Avg],[Temp_24_m_Avg])
+IR_test;SUBTRACT([IR_R_R_Avg],[IR_R_I_Avg])
+test;SUM([T_Fall_1_Tot],[T_Fall_2_Tot])
+integ test;INTEGRAL([Wind_40_m],H)
+differ test;DERIVATIVE([Wind_40_m],H)

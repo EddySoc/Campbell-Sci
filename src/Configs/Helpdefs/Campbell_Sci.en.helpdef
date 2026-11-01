@@ -1,0 +1,66 @@
+# Campbell Sci Viewer
+
+## Opening a data file
+Use Open Data to open a Campbell .dat file (TOA5 and TOACI1) or a general .csv/.txt measurement file. For general files the first line must contain the column names; the delimiter (comma, semicolon, tab) and decimal comma are detected automatically, and the column with dates/times is used as the time axis. A chart is created per numeric column; use the LogDef Editor and a `<filename start>.logdef` to compose your own charts. The viewer picks the chart configuration based on the logger name (start of the file name) and, if present, the location code.
+
+## Viewing charts
+The Data tab shows the loaded measurements. The Calc tab shows the columns calculated by the formulas. The other tabs show charts from the matching .logdef configuration. Tab colors help recognise charts by subject, for example yellow for sun and blue for precipitation.
+
+## Editing and saving data
+Double-click a cell in the Data tab, or press Enter, F2 or just start typing, to change the value. Enter confirms and moves the cursor to the cell below. Select several cells with the mouse (click and drag) or with Shift plus click or the arrow keys; the selected cells are highlighted. Delete clears the selection. Use Save to store the modified data as a new .dat file; the original file is not overwritten.
+The Calc tab supports the same selection and Ctrl+C to copy, but is read-only.
+
+## Changing charts and configurations
+Open LogDef Editor to compose charts and to load, edit and save a .logdef file. Logger configurations are stored in Configs/Logdefs. If the file name contains a location code, a configuration for that logger and location is searched first; otherwise the general logger configuration is used.
+
+## Navigating charts
+Use the mouse wheel over the chart to zoom in or out horizontally. Place the mouse over the left or right margin of the plot and use the mouse wheel to scroll through the measurement period. Hovering over a point on a line shows its column, time and value next to the cursor. Check Auto-scale Y axis when zooming to rescale the Y axis while scrolling.
+
+## Language
+Choose the language with the selector at the right of the toolbar; the choice is saved. Language files are stored in Configs/Langdefs (`<code>.langdef`). To add a language, copy `en.langdef` to a new file such as `fr.langdef`, set `language.name` and translate the texts. An optional translated help file can be named `Campbell_Sci.<code>.helpdef` in Configs/Helpdefs. Names of functions and charts in your own configuration files are not translated.
+
+## Formulas and custom functions
+Open Formula Editor to add calculated columns to the measurement data. Give each calculation a name and write the formula in the formula field. Test formula checks the formula; Save and apply calculates the column and adds it to the data.
+
+### Writing formulas
+Refer to an existing column with the column name between square brackets, for example `[Temp_02_m_Avg] * 1.8 + 32`. Double-click a column in the column list to insert it. All columns of the Data and Calc sheets are always available.
+Use a decimal point for decimals. Double-clicking a function inserts it as `FUNCTION()` with the cursor between the brackets. A chosen column is inserted at the cursor position followed by a comma; a superfluous trailing comma is removed on confirm. Function arguments may be separated by commas or semicolons. Examples:
+- `[Temp_02_m_Avg] - [Temp_02_m_Min]`
+- `IF([Regen] > 0; 1; 0)`
+- `DAGGEM([Temp_02_m_Avg])`
+
+The usual operators are `+`, `-`, `*`, `/`, `^` (power) and `%` (remainder). Comparisons such as `>`, `>=`, `<`, `<=`, `=` and `<>` can be used in conditions. `AND`, `OR` and `NOT` combine conditions; `TRUE` and `FALSE` are available as logical values. `PI` is the constant pi. Formulas are calculated per measurement row.
+
+Formulas are stored in `Configs/Formuladefs` in files of the form `name;formula`. The editor first uses a file for the logger and location (`LOGGER_LOCATION.formuladef`) if it exists, otherwise the general logger file (`LOGGER.formuladef`). For logger code BRAS, `BM.formuladef` is the fallback. The order in the editor is the calculation order: a formula can use columns from earlier formulas. Use Up and Down to change that order.
+
+### Built-in functions
+In the data a row is one measurement moment and a column is one quantity. Separate multiple arguments with commas or semicolons.
+- Combining columns at the same moment: `SUM(a; b; ...)`, `SUBTRACT(a; b; ...)`, `PRODUCT(a; b; ...)` (also `MULTIPLY`), `DIVIDE(a; b; ...)`, `MIN(a; b; ...)`, `MAX(a; b; ...)` and `AVERAGE(a; b; ...)` work per row on the given columns. For example `SUBTRACT([Meting_A]; [Meting_B])` subtracts the second value from the first; `DIVIDE([Meting_A]; [Meting_B])` divides the first by the second. With more arguments, subtraction and division are applied successively from left to right. `SUM` therefore does not add all rows of one column over time. Only combine quantities whose units match.
+- Summarising one column per day: `DAGMIN(x)`, `DAGMAX(x)`, `DAGSOM(x)` and `DAGGEM(x)` calculate the minimum, maximum, sum and mean of that column for each day.
+- Conditions: `IF(condition; value_if_true; value_if_false)`, `AND(a; b; ...)`, `OR(a; b; ...)` and `NOT(a)`.
+- Maths: `ABS(x)`, `SQRT(x)`, `ROUND(x; decimals)`, `INT(x)`, `POWER(x; y)`, `MOD(x; y)`, `LN(x)`, `LOG10(x)` and `EXP(x)`.
+- Trigonometry: `SIN(x)`, `COS(x)` and `TAN(x)` expect radians. Use `RADIANS(degrees)` or `DEGREES(radians)` to convert.
+- Time series: `DIFF(x)` gives the difference with the previous row for one column; `ROLLAVG(x; n)` gives the rolling mean over n consecutive rows.
+- Derivative and integral: `DERIVATIVE(x; unit)` (AFGELEIDE) gives the change of x per time unit; `INTEGRAL(x; unit)` (INTEGRAAL) gives the running integral over time (trapezoidal rule, missing values count as 0). The unit is `SEC`, `MIN`, `UUR` or `DAG` (also `S`, `H`, `D`) written without quotes; without a unit, hours are used. For example `INTEGRAL([Straling]; UUR)`.
+- Time and sun: `STAP()` gives the time step in hours, `UUR()` the time of the row as decimal hour, and `ZONOP(latitude; longitude; utc)` and `ZONONDER(latitude; longitude; utc)` the sunrise and sunset as decimal hour. `utc` is the difference between logger time and UTC in hours.
+
+Dutch aliases are available: `SOM` (SUM), `AFTREKKEN` (SUBTRACT), `VERMENIGVULDIGEN` (PRODUCT), `DELEN` (DIVIDE), `GEMIDDELDE` (AVERAGE), `ALS` (IF), `EN` (AND), `OF` (OR), `NIET` (NOT), `WORTEL` (SQRT), `AFRONDEN` (ROUND), `MACHT` (POWER), `REST` (MOD), `HELE` (INT), `VERSCHIL` (DIFF) and `GLIJDEND` (ROLLAVG). The daily functions also have the English aliases `DAYMIN`, `DAYMAX`, `DAYSUM`, `DAYAVG` and `DAYAVERAGE`.
+
+### Custom functions and constants
+The Edit custom functions... button opens `Configs/Functiedefs/Functies.funcdef`. Custom definitions are loaded for all loggers. A constant has the form `NAME = value_or_formula`; a function has the form `NAME(parameter1; parameter2) = formula`. Use parameters in the formula as `parameter1` or `[parameter1]`. Examples:
+
+`FACTOR = 1.8`
+
+`TO_CELSIUS(f) = (f - 32) / FACTOR`
+
+Double-click a function in the function list to insert it with brackets; the cursor is placed between the brackets. Custom constants are inserted without brackets. Custom functions and constants are shown in blue. Custom functions can use built-in functions and constants. Names of built-in functions and constants cannot be redefined.
+
+## Context menus
+Context menus are available by right-clicking in the Data tab, the Calc tab or a chart tab.
+For Go to Data you must right-click on a chart line.
+
+## Menu configurations
+Menu configurations are stored in Configs/Menudefs so they are easy to adapt or extend. Menu texts are translated through the Langdefs (`menu.<action>`).
+
+## Help text
+This help text is stored in Configs/Helpdefs/Campbell_Sci.en.helpdef and can be edited there.

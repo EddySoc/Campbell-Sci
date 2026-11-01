@@ -10,6 +10,8 @@ from typing import Any, Callable
 import numpy as np
 import pandas as pd
 
+from i18n import t
+
 FORMULA_HEADER = (
     "# name;formula\n"
     "# Excel-achtige formules. Kolommen: [Kolomnaam]. Dagfuncties: DAGMIN, DAGMAX, DAGSOM, DAGGEM.\n"
@@ -48,7 +50,7 @@ def load_formulas(logger: str, location: str | None, config_dir: str | Path) -> 
             continue
         name, separator, expression = line.partition(";")
         if not separator or not name.strip() or not expression.strip():
-            raise ValueError(f"Ongeldige formule in {path.name}:{number}")
+            raise ValueError(t("ferr.invalid_formula", name=path.name, line=number))
         formulas.append({"name": name.strip(), "expression": expression.strip()})
     return formulas
 
@@ -83,7 +85,20 @@ _COMPARE = {
     ast.Eq: operator.eq, ast.NotEq: operator.ne, ast.Lt: operator.lt,
     ast.LtE: operator.le, ast.Gt: operator.gt, ast.GtE: operator.ge,
 }
+class _Unit(float):
+    """Tijdseenheid als argument van DERIVATIVE/INTEGRAL; de waarde is het aantal seconden."""
+
+    @property
+    def seconds(self) -> float:
+        return float(self)
+
+
+_UNITS = {
+    "SEC": 1, "S": 1, "MIN": 60, "UUR": 3600, "H": 3600, "DAG": 86400, "D": 86400,
+}
+
 ALIASES = {
+    "AFGELEIDE": "DERIVATIVE", "INTEGRAAL": "INTEGRAL",
     "SOM": "SUM", "GEMIDDELDE": "AVERAGE", "ALS": "IF", "EN": "AND", "OF": "OR", "NIET": "NOT",
     "WORTEL": "SQRT", "AFRONDEN": "ROUND", "MACHT": "POWER", "REST": "MOD", "HELE": "INT",
     "DAYMIN": "DAGMIN", "DAYMAX": "DAGMAX", "DAYSUM": "DAGSOM", "DAYAVG": "DAGGEM", "DAYAVERAGE": "DAGGEM",
@@ -125,10 +140,16 @@ FUNCTION_HELP = {
     "DIFF": "DIFF(x) - verschil met vorige rij (VERSCHIL)",
     "ROLLAVG": "ROLLAVG(x; n) - voortschrijdend gemiddelde over n rijen (GLIJDEND)",
     "STAP": "STAP() - tijdstap van de data in uren",
+    "DERIVATIVE": "DERIVATIVE(x; eenheid) - afgeleide per tijdseenheid: SEC, MIN, UUR of DAG (AFGELEIDE)",
+    "INTEGRAL": "INTEGRAL(x; eenheid) - lopende integraal over de tijd: SEC, MIN, UUR of DAG (INTEGRAAL)",
     "UUR": "UUR() - tijdstip van de rij als decimaal uur (0-24)",
     "ZONOP": "ZONOP(breedte; lengte; utc-verschil) - zonsopkomst in decimaal uur",
     "ZONONDER": "ZONONDER(breedte; lengte; utc-verschil) - zonsondergang in decimaal uur",
 }
+
+def function_help() -> dict[str, str]:
+    return {name: t(f"func.{name}", default=text) for name, text in FUNCTION_HELP.items()}
+
 
 _MACRO_HEAD = re.compile(r"^([A-Za-z_]\w*)\s*(?:\(([^)]*)\))?$")
 MAX_CALL_DEPTH = 20
@@ -140,6 +161,10 @@ FUNCDEF_HEADER = (
 )
 
 
+def funcdef_header() -> str:
+    return t("funcdef.header", default=FUNCDEF_HEADER)
+
+
 def parse_funcdefs(text: str, source: str = "funcdef") -> dict[str, dict[str, Any]]:
     macros: dict[str, dict[str, Any]] = {}
     for number, raw in enumerate(text.splitlines(), 1):
@@ -149,10 +174,10 @@ def parse_funcdefs(text: str, source: str = "funcdef") -> dict[str, dict[str, An
         head, separator, body = line.partition("=")
         match = _MACRO_HEAD.match(head.strip())
         if not separator or not match or not body.strip():
-            raise ValueError(f"Ongeldige definitie in {source}:{number}")
+            raise ValueError(t("ferr.invalid_definition", source=source, line=number))
         name = match.group(1).upper()
         if name in FUNCTION_HELP or name in ALIASES or name in _CONSTANTS:
-            raise ValueError(f"'{match.group(1)}' is een ingebouwde naam ({source}:{number})")
+            raise ValueError(t("ferr.builtin_name", name=match.group(1), source=source, line=number))
         params = None if match.group(2) is None else [
             p.strip().upper() for p in re.split(r"[;,]", match.group(2)) if p.strip()
         ]
@@ -173,9 +198,9 @@ def macro_help(macros: dict[str, dict[str, Any]]) -> dict[str, str]:
     result = {}
     for macro in macros.values():
         if macro["params"] is None:
-            result[macro["name"]] = f"{macro['name']} - eigen constante"
+            result[macro["name"]] = t("ferr.own_constant", name=macro["name"])
         else:
-            result[macro["name"]] = f"{macro['name']}({'; '.join(macro['params'])}) - eigen functie"
+            result[macro["name"]] = t("ferr.own_function", name=macro["name"], params="; ".join(macro["params"]))
     return result
 
 
@@ -220,7 +245,7 @@ class _Evaluator:
             return self.params[key]
         column = self.lookup.get(key)
         if column is None:
-            raise FormulaError(f"Kolom '{name}' bestaat niet.")
+            raise FormulaError(t("ferr.column_missing", name=name))
         return pd.to_numeric(self.measure[column], errors="coerce").astype(float)
 
     def times(self) -> pd.Series:
@@ -236,8 +261,22 @@ class _Evaluator:
     def _step(self) -> np.float64:
         seconds = self.times().diff().dt.total_seconds().median()
         if pd.isna(seconds) or seconds <= 0:
-            raise FormulaError("De tijdstap van de data kan niet worden bepaald.")
+            raise FormulaError(t("ferr.no_timestep"))
         return np.float64(seconds / 3600)
+
+    def _unit_seconds(self, unit: Any) -> float:
+        return float(unit.seconds) if isinstance(unit, _Unit) else 3600.0
+
+    def _elapsed(self, unit: Any) -> pd.Series:
+        return self.times().diff().dt.total_seconds() / self._unit_seconds(unit)
+
+    def _derivative(self, value: Any, unit: Any = None) -> pd.Series:
+        return self.series(value).astype(float).diff() / self._elapsed(unit)
+
+    def _integral(self, value: Any, unit: Any = None) -> pd.Series:
+        series = self.series(value).astype(float)
+        area = (series + series.shift()) / 2 * self._elapsed(unit)
+        return area.fillna(0).cumsum()
 
     def _hour(self) -> pd.Series:
         times = self.times()
@@ -275,9 +314,9 @@ class _Evaluator:
     def _across(self, how: str) -> Callable[..., pd.Series]:
         def calculate(*values: Any) -> pd.Series:
             if not values:
-                raise FormulaError("Minstens één argument nodig.")
+                raise FormulaError(t("ferr.min_one_arg"))
             if how in {"subtract", "divide"} and len(values) < 2:
-                raise FormulaError("Minstens twee argumenten nodig.")
+                raise FormulaError(t("ferr.min_two_args"))
             if how in {"subtract", "multiply", "divide"}:
                 result = self.series(values[0]).astype(float)
                 for value in values[1:]:
@@ -302,7 +341,7 @@ class _Evaluator:
     def _logic(self, combine: Callable[[Any, Any], Any]) -> Callable[..., Any]:
         def calculate(*values: Any) -> Any:
             if not values:
-                raise FormulaError("Minstens één argument nodig.")
+                raise FormulaError(t("ferr.min_one_arg"))
             result = self.boolean(values[0])
             for value in values[1:]:
                 result = combine(result, self.boolean(value))
@@ -332,6 +371,7 @@ class _Evaluator:
             "DIFF": lambda value: self.series(value).astype(float).diff(),
             "ROLLAVG": self._rolling,
             "STAP": self._step, "UUR": self._hour,
+            "DERIVATIVE": self._derivative, "INTEGRAL": self._integral,
             "ZONOP": lambda *args: self._sun(True, *args),
             "ZONONDER": lambda *args: self._sun(False, *args),
         }
@@ -340,14 +380,14 @@ class _Evaluator:
     def _call_macro(self, macro: dict[str, Any], arguments: list[Any]) -> Any:
         params = macro["params"] or []
         if len(arguments) != len(params):
-            raise FormulaError(f"{macro['name']} verwacht {len(params)} argument(en).")
+            raise FormulaError(t("ferr.expects_args", name=macro["name"], count=len(params)))
         if self.depth >= MAX_CALL_DEPTH:
-            raise FormulaError(f"Te diepe functie-aanroep bij {macro['name']} (recursie?).")
+            raise FormulaError(t("ferr.too_deep", name=macro["name"]))
         text, references = _preprocess(macro["body"])
         try:
             tree = ast.parse(text, mode="eval")
         except SyntaxError as exc:
-            raise FormulaError(f"Syntaxfout in definitie van {macro['name']}.") from exc
+            raise FormulaError(t("ferr.syntax_definition", name=macro["name"])) from exc
         saved = (self.params, self.references)
         self.params, self.references = dict(zip(params, arguments)), references
         self.depth += 1
@@ -365,7 +405,7 @@ class _Evaluator:
                 return node.value
             if isinstance(node.value, (int, float)):
                 return np.float64(node.value)
-            raise FormulaError("Alleen getallen zijn toegestaan als constante.")
+            raise FormulaError(t("ferr.only_numbers"))
         if isinstance(node, ast.Name):
             match = _PLACEHOLDER.fullmatch(node.id)
             if match:
@@ -377,6 +417,8 @@ class _Evaluator:
                 return self._call_macro(macro, [])
             if node.id.upper() in _CONSTANTS:
                 return _CONSTANTS[node.id.upper()]
+            if node.id.upper() in _UNITS:
+                return _Unit(_UNITS[node.id.upper()])
             return self.column(node.id)
         if isinstance(node, ast.BinOp) and type(node.op) in _BINARY:
             return _BINARY[type(node.op)](self.visit(node.left), self.visit(node.right))
@@ -393,7 +435,7 @@ class _Evaluator:
             result: Any = True
             for op, comparator in zip(node.ops, node.comparators):
                 if type(op) not in _COMPARE:
-                    raise FormulaError("Niet-ondersteunde vergelijking.")
+                    raise FormulaError(t("ferr.unsupported_comparison"))
                 right = self.visit(comparator)
                 result = result & _COMPARE[type(op)](left, right)
                 left = right
@@ -403,23 +445,23 @@ class _Evaluator:
             return self.functions[name](*[self.visit(value) for value in node.values])
         if isinstance(node, ast.Call):
             if not isinstance(node.func, ast.Name) or node.keywords:
-                raise FormulaError("Ongeldige functie-aanroep.")
+                raise FormulaError(t("ferr.invalid_call"))
             name = node.func.id.upper()
             arguments = [self.visit(argument) for argument in node.args]
             macro = self.macros.get(name)
             if macro is not None:
                 if macro["params"] is None:
-                    raise FormulaError(f"'{macro['name']}' is een constante, geen functie.")
+                    raise FormulaError(t("ferr.constant_not_function", name=macro["name"]))
                 return self._call_macro(macro, arguments)
             name = ALIASES.get(name, name)
             function = self.functions.get(name)
             if function is None:
-                raise FormulaError(f"Onbekende functie '{node.func.id}'.")
+                raise FormulaError(t("ferr.unknown_function", name=node.func.id))
             try:
                 return function(*arguments)
             except TypeError as exc:
-                raise FormulaError(f"Onjuiste argumenten voor {name}.") from exc
-        raise FormulaError("Niet-ondersteunde syntax in formule.")
+                raise FormulaError(t("ferr.bad_arguments", name=name)) from exc
+        raise FormulaError(t("ferr.unsupported_syntax"))
 
 
 def evaluate_formula(
@@ -431,11 +473,11 @@ def evaluate_formula(
     """Berekent de formule voor de meetrijen (na de koprijen) van data."""
     text, references = _preprocess(expression)
     if not text:
-        raise FormulaError("Formule is leeg.")
+        raise FormulaError(t("ferr.empty_formula"))
     try:
         tree = ast.parse(text, mode="eval")
     except SyntaxError as exc:
-        raise FormulaError("Syntaxfout in formule.") from exc
+        raise FormulaError(t("ferr.syntax_formula")) from exc
     evaluator = _Evaluator(data, header_rows, references, macros)
     try:
         with np.errstate(all="ignore"):
@@ -463,9 +505,9 @@ def apply_formulas(
         name = formula["name"].strip()
         try:
             if not name:
-                raise FormulaError("Naam ontbreekt.")
+                raise FormulaError(t("ferr.name_missing"))
             if name.upper() in {str(column).strip().upper() for column in result.columns}:
-                raise FormulaError("Er bestaat al een kolom met deze naam.")
+                raise FormulaError(t("ferr.name_exists"))
             values = evaluate_formula(formula["expression"], result, header_rows, macros)
         except FormulaError as exc:
             errors.append(f"{name or '?'}: {exc}")
