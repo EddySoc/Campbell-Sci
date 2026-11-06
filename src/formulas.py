@@ -94,11 +94,15 @@ class _Unit(float):
 
 
 _UNITS = {
-    "SEC": 1, "S": 1, "MIN": 60, "UUR": 3600, "H": 3600, "DAG": 86400, "D": 86400,
+    "SECOND": 1, "MINUTE": 60, "HOUR": 3600, "DAY": 86400,
 }
 
 ALIASES = {
     "AFGELEIDE": "DERIVATIVE", "INTEGRAAL": "INTEGRAL",
+    "EERSTE_AFGELEIDE": "FIRST_DERIVATIVE",
+    "TWEEDE_AFGELEIDE": "SECOND_DERIVATIVE",
+    "CUMULATIEVE_INTEGRAAL": "CUMULATIVE_INTEGRAL",
+    "INTEGRAAL_VAN_AFWIJKING": "INTEGRAL_DEVIATION",
     "SOM": "SUM", "GEMIDDELDE": "AVERAGE", "ALS": "IF", "EN": "AND", "OF": "OR", "NIET": "NOT",
     "WORTEL": "SQRT", "AFRONDEN": "ROUND", "MACHT": "POWER", "REST": "MOD", "HELE": "INT",
     "DAYMIN": "DAGMIN", "DAYMAX": "DAGMAX", "DAYSUM": "DAGSOM", "DAYAVG": "DAGGEM", "DAYAVERAGE": "DAGGEM",
@@ -140,8 +144,12 @@ FUNCTION_HELP = {
     "DIFF": "DIFF(x) - verschil met vorige rij (VERSCHIL)",
     "ROLLAVG": "ROLLAVG(x; n) - voortschrijdend gemiddelde over n rijen (GLIJDEND)",
     "STAP": "STAP() - tijdstap van de data in uren",
-    "DERIVATIVE": "DERIVATIVE(x; eenheid) - afgeleide per tijdseenheid: SEC, MIN, UUR of DAG (AFGELEIDE)",
-    "INTEGRAL": "INTEGRAL(x; eenheid) - lopende integraal over de tijd: SEC, MIN, UUR of DAG (INTEGRAAL)",
+    "DERIVATIVE": "DERIVATIVE(x; eenheid) - afgeleide per tijdseenheid: SECOND, MINUTE, HOUR of DAY (AFGELEIDE)",
+    "INTEGRAL": "INTEGRAL(x; eenheid) - lopende integraal over de tijd: SECOND, MINUTE, HOUR of DAY (INTEGRAAL)",
+    "FIRST_DERIVATIVE": "FIRST_DERIVATIVE(x; eenheid) - eerste afgeleide per tijdseenheid",
+    "SECOND_DERIVATIVE": "SECOND_DERIVATIVE(x; eenheid) - tweede afgeleide per tijdseenheid",
+    "CUMULATIVE_INTEGRAL": "CUMULATIVE_INTEGRAL(x; eenheid) - cumulatieve trapeziumintegraal over de tijd",
+    "INTEGRAL_DEVIATION": "INTEGRAL_DEVIATION(x; eenheid) - cumulatieve integraal van x minus het gemiddelde van x",
     "UUR": "UUR() - tijdstip van de rij als decimaal uur (0-24)",
     "ZONOP": "ZONOP(breedte; lengte; utc-verschil) - zonsopkomst in decimaal uur",
     "ZONONDER": "ZONONDER(breedte; lengte; utc-verschil) - zonsondergang in decimaal uur",
@@ -265,7 +273,9 @@ class _Evaluator:
         return np.float64(seconds / 3600)
 
     def _unit_seconds(self, unit: Any) -> float:
-        return float(unit.seconds) if isinstance(unit, _Unit) else 3600.0
+        if unit is None:
+            raise FormulaError(t("ferr.unit_required", func="DERIVATIVE/INTEGRAL"))
+        return float(unit.seconds) if isinstance(unit, _Unit) else float(unit)
 
     def _elapsed(self, unit: Any) -> pd.Series:
         return self.times().diff().dt.total_seconds() / self._unit_seconds(unit)
@@ -277,6 +287,13 @@ class _Evaluator:
         series = self.series(value).astype(float)
         area = (series + series.shift()) / 2 * self._elapsed(unit)
         return area.fillna(0).cumsum()
+
+    def _second_derivative(self, value: Any, unit: Any = None) -> pd.Series:
+        return self._derivative(self._derivative(value, unit), unit)
+
+    def _integral_deviation(self, value: Any, unit: Any = None) -> pd.Series:
+        series = self.series(value).astype(float)
+        return self._integral(series - series.mean(), unit)
 
     def _hour(self) -> pd.Series:
         times = self.times()
@@ -372,6 +389,8 @@ class _Evaluator:
             "ROLLAVG": self._rolling,
             "STAP": self._step, "UUR": self._hour,
             "DERIVATIVE": self._derivative, "INTEGRAL": self._integral,
+            "FIRST_DERIVATIVE": self._derivative, "SECOND_DERIVATIVE": self._second_derivative,
+            "CUMULATIVE_INTEGRAL": self._integral, "INTEGRAL_DEVIATION": self._integral_deviation,
             "ZONOP": lambda *args: self._sun(True, *args),
             "ZONONDER": lambda *args: self._sun(False, *args),
         }
