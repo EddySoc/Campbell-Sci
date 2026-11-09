@@ -40,6 +40,35 @@ status.saved=Opgeslagen: {name}
 tab.charts=Grafieken
 tab.data=Data
 tab.calc=Calc
+tab.pivot=Pivot
+pivot.editor=Pivot Editor
+pivot.formulas=Pivot Formules
+pivot.name=Naam van de kolom
+pivot.source=Bronkolom (Data of Calc)
+pivot.interval=Periode
+pivot.function=Berekening
+pivot.hint=Elke Pivot-kolom bevat één waarde per periode. Weken beginnen op maandag. Geef elke kolom een unieke naam.
+pivot.empty=Maak eerst een draaitabel in de Pivot Editor.
+pivot.invalid_definition=Ongeldige draaitabeldefinitie: naam, bronkolom, periode en berekening zijn verplicht.
+pivot.unnamed=Nieuwe draaitabel {number}
+pivot.missing_fields=Draaitabel '{name}': vul de volgende velden in: {fields}.
+pivot.duplicate=Kolomnaam '{name}' is al in gebruik.
+pivot.no_time=De data bevatten geen geldige tijdstippen voor een draaitabel.
+pivot.no_numeric=Kolom '{name}' bevat geen numerieke waarden.
+pivot.invalid_times=Kolom '{name}' bevat {count} waarde(n) zonder geldig tijdstip.
+pivot.chart_needs_time=Pivot-kolommen vereisen een tijdkolom op de X-as.
+pivot.period.minute=Minuut
+pivot.period.hour=Uur
+pivot.period.day=Dag
+pivot.period.week=Week
+pivot.period.month=Maand
+pivot.period.year=Jaar
+pivot.aggregation.mean=Gemiddelde
+pivot.aggregation.sum=Som
+pivot.aggregation.min=Minimum
+pivot.aggregation.max=Maximum
+pivot.aggregation.count=Aantal
+pivot.aggregation.median=Mediaan
 
 # Knoppen
 button.previous=Vorige
@@ -96,6 +125,8 @@ logdef.title_edit=Logdef bewerken - {name}
 logdef.charts=Grafieken
 logdef.name=Naam
 logdef.type=Type
+logdef.type.bar_grouped=Staaf naast elkaar
+logdef.type.bar_range=Staaf min-gem-max
 logdef.minimum=Minimum
 logdef.maximum=Maximum
 logdef.number_format=Getalformaat
@@ -107,7 +138,21 @@ logdef.unassign=< Verwijder
 logdef.load=Laad .logdef...
 logdef.save_as=Opslaan als .logdef...
 logdef.hint_time=Gekozen kolommen (tijd wordt automatisch x-as)
-logdef.hint_scatter=Gekozen kolommen (eerste = X, tweede = Y)
+logdef.hint_grouped=Kolommen naast elkaar (tijd wordt automatisch x-as)
+logdef.hint_range=Voeg een voor een toe: minimum, gemiddelde, maximum (zelfde tijdsbasis)
+logdef.range_columns='{name}': kies precies drie kolommen in de volgorde minimum, gemiddelde, maximum.
+logdef.auto_time='{name}': kies geen tijdkolom; die wordt automatisch toegevoegd.
+chart.range_order=Bereikgrafiek: minimum moet kleiner dan of gelijk aan gemiddelde en maximum zijn, en gemiddelde kleiner dan of gelijk aan maximum.
+chart.range_order_details=Bereikgrafiek: minimum ≤ gemiddelde ≤ maximum vereist. Controleer de kolomvolgorde en brongegevens. Bij {time}: minimum '{minimum}' = {min_value}, gemiddelde '{mean}' = {mean_value}, maximum '{maximum}' = {max_value}.
+chart.range_period=Bereikgrafiek: kies drie kolommen met dezelfde tijdsbasis.
+chart.range_columns=Bereikgrafiek vereist drie kolommen: minimum, gemiddelde, maximum.
+chart.bar_secondary=Deze staafgrafiek ondersteunt geen secundaire as.
+logdef.hint_scatter=Kies precies twee kolommen: eerste = Y, tweede = X
+logdef.assign=Toevoegen >
+logdef.trend_linear=Lineaire trendlijn (vergelijking en R²)
+logdef.scatter_columns='{name}': kies precies twee kolommen: eerst Y, dan X.
+chart.trend_insufficient=Geen trendlijn: minstens twee punten met verschillende X-waarden nodig.
+chart.trend_undefined=niet gedefinieerd
 logdef.hint_windrose=Gekozen kolom (1 richtingskolom)
 logdef.open_title=Open .logdef
 logdef.no_charts=Geen grafieken gevonden in dit bestand.
@@ -115,6 +160,8 @@ logdef.invalid_line=Ongeldige regel {number} in {name}
 logdef.min_columns='{name}': kies minimaal {needed} kolom(men).
 logdef.choose_columns=Kies kolommen voor minstens één grafiek.
 logdef.save_title=Opslaan als
+logdef.saved_not_active='{name}' is opgeslagen, maar is niet de actieve configuratie voor dit meetbestand. De grafieken zijn niet gewijzigd.
+logdef.reload_failed=De configuratie is opgeslagen, maar de grafieken konden niet worden vernieuwd: {error}
 
 # Formule editor
 formula.title=Formules bewerken

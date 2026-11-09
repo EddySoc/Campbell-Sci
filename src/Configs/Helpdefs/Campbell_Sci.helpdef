@@ -5,6 +5,12 @@ Gebruik Open Data om een Campbell .dat-bestand (TOA5 en TOACI1) of een gewoon .c
 
 ## Grafieken bekijken
 De Data-tab toont de ingelezen meetwaarden. De andere tabs tonen grafieken uit de bijbehorende .logdef-configuratie. Tabkleuren helpen grafieken per onderwerp te herkennen, bijvoorbeeld geel voor zon en blauw voor neerslag.
+Scroll door de tabs met de pijltjes of met het muiswiel boven de tabstrook.
+
+## Draaitabellen
+Open Pivot Editor en kies per kolom een bron uit Data of Calc, een berekening en een periode: minuut, uur, dag, week, maand of jaar. De tijdstippen vallen aan het begin van de periode; een week begint op maandag. Geef elke kolom een unieke naam. De Pivot-tab toont de kolommen van de gekozen periode. Met Pivot Formules maak je formules op diezelfde tijdsbasis.
+Gebruik Omhoog en Omlaag om de volgorde van de Pivot-kolommen te wijzigen.
+Pivot-kolommen zijn beschikbaar in de LogDef Editor. Meetreeksen en Pivot-reeksen kunnen in één tijdgrafiek worden getoond, ieder met hun eigen tijdstippen. In een scattergrafiek worden alleen exact overeenkomende tijdstippen gecombineerd. Definities staan in Configs/Pivotdefs en Pivot-formules in Configs/PivotFormuladefs.
 
 ## Data aanpassen en opslaan
 Dubbelklik op een cel in de Data-tab om de waarde te wijzigen. Gebruik Opslaan om de gewijzigde data als een nieuw .dat-bestand op te slaan; het oorspronkelijke bestand wordt niet overschreven.
@@ -12,6 +18,11 @@ Er kunnen ook meerdere waarden worden aangeduid om te resetten.
 
 ## Grafieken en configuraties aanpassen
 Open LogDef Editor om grafieken samen te stellen en een .logdef-bestand te laden, te editeren en op te slaan. Loggerconfiguraties staan in Configs/Logdefs. Als er een locatiecode in de bestandsnaam staat, wordt eerst een configuratie voor die logger en locatie gezocht; anders wordt de algemene loggerconfiguratie gebruikt.
+Opslaan bewaart een bestaande configuratie direct, sluit de editor en vernieuwt de grafieken. Bij een nieuwe configuratie kies je eerst een bestand. Gebruik Opslaan als om een andere naam of locatie te kiezen; alleen de actieve configuratie voor het meetbestand wordt toegepast.
+Kies Staaf naast elkaar om reeksen per tijdstip naast elkaar te tonen. Kies Staaf min-gem-max voor een balk van minimum tot maximum: voeg precies drie kolommen een voor een toe in de volgorde minimum, gemiddelde, maximum. Het gemiddelde wordt ook met een markering aangegeven. De kolommen moeten dezelfde tijdsbasis hebben en de waarden moeten voldoen aan minimum ≤ gemiddelde ≤ maximum. Negatieve waarden zijn toegestaan. De tijdkolom wordt automatisch toegevoegd; de bestaande staafgrafiek blijft ongewijzigd.
+De donkere nullijn maakt negatieve waarden zichtbaar. Een Pivot-gemiddelde is het gemiddelde van alle beschikbare meetwaarden in de periode, niet het gemiddelde van alleen minimum en maximum.
+Gebruik de knoppen Omhoog en Omlaag onder de gekozen kolommen om hun volgorde aan te passen.
+Bij een scattergrafiek kies je precies twee kolommen: eerst Y (verticaal), daarna X (horizontaal). Een secundaire Y-as is hiervoor niet nodig. Vink Lineaire trendlijn aan om de regressielijn, vergelijking en R² te tonen. De lijn gebruikt alle geldige X/Y-punten; minstens twee verschillende X-waarden zijn nodig. Bij een constante Y is R² niet gedefinieerd. Bestaande scattergrafieken behouden hun assen.
 
 ## Navigeren in grafieken
 Gebruik het muiswiel boven de grafiek om horizontaal in of uit te zoomen. Plaats de muis boven de linker- of rechtermarge van de plot en gebruik het muiswiel om door de meetperiode te schuiven. Maximalisatie tijdens het scrollen is mogelijk door Y-as automatisch schalen aan te vinken.

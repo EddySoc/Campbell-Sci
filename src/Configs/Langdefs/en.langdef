@@ -40,6 +40,35 @@ status.saved=Saved: {name}
 tab.charts=Charts
 tab.data=Data
 tab.calc=Calc
+tab.pivot=Pivot
+pivot.editor=Pivot Editor
+pivot.formulas=Pivot Formulas
+pivot.name=Column name
+pivot.source=Source column (Data or Calc)
+pivot.interval=Period
+pivot.function=Aggregation
+pivot.hint=Each Pivot column contains one value per period. Weeks start on Monday. Give every column a unique name.
+pivot.empty=First create a pivot table in the Pivot Editor.
+pivot.invalid_definition=Invalid pivot definition: name, source column, period and aggregation are required.
+pivot.unnamed=New pivot {number}
+pivot.missing_fields=Pivot '{name}': complete the following fields: {fields}.
+pivot.duplicate=Column name '{name}' is already in use.
+pivot.no_time=The data contain no valid timestamps for a pivot table.
+pivot.no_numeric=Column '{name}' contains no numeric values.
+pivot.invalid_times=Column '{name}' contains {count} value(s) without a valid timestamp.
+pivot.chart_needs_time=Pivot columns require a time column on the X axis.
+pivot.period.minute=Minute
+pivot.period.hour=Hour
+pivot.period.day=Day
+pivot.period.week=Week
+pivot.period.month=Month
+pivot.period.year=Year
+pivot.aggregation.mean=Mean
+pivot.aggregation.sum=Sum
+pivot.aggregation.min=Minimum
+pivot.aggregation.max=Maximum
+pivot.aggregation.count=Count
+pivot.aggregation.median=Median
 
 # Buttons
 button.previous=Previous
@@ -96,6 +125,8 @@ logdef.title_edit=Edit logdef - {name}
 logdef.charts=Charts
 logdef.name=Name
 logdef.type=Type
+logdef.type.bar_grouped=Grouped bars
+logdef.type.bar_range=Min-mean-max bars
 logdef.minimum=Minimum
 logdef.maximum=Maximum
 logdef.number_format=Number format
@@ -107,7 +138,21 @@ logdef.unassign=< Remove
 logdef.load=Load .logdef...
 logdef.save_as=Save as .logdef...
 logdef.hint_time=Selected columns (time automatically becomes the x axis)
-logdef.hint_scatter=Selected columns (first = X, second = Y)
+logdef.hint_grouped=Columns side by side (time automatically becomes the x axis)
+logdef.hint_range=Add one at a time: minimum, mean, maximum (same time basis)
+logdef.range_columns='{name}': choose exactly three columns in minimum, mean, maximum order.
+logdef.auto_time='{name}': do not select the time column; it is added automatically.
+chart.range_order=Range chart: minimum must be at most the mean, and the mean at most the maximum.
+chart.range_order_details=Range chart: minimum ≤ mean ≤ maximum required. Check column order and source data. At {time}: minimum '{minimum}' = {min_value}, mean '{mean}' = {mean_value}, maximum '{maximum}' = {max_value}.
+chart.range_period=Range chart: choose three columns with the same time basis.
+chart.range_columns=Range chart requires three columns: minimum, mean, maximum.
+chart.bar_secondary=This bar chart does not support a secondary axis.
+logdef.hint_scatter=Select exactly two columns: first = Y, second = X
+logdef.assign=Add >
+logdef.trend_linear=Linear trendline (equation and R²)
+logdef.scatter_columns='{name}': choose exactly two columns: first Y, then X.
+chart.trend_insufficient=No trendline: at least two points with different X values are required.
+chart.trend_undefined=undefined
 logdef.hint_windrose=Selected column (1 direction column)
 logdef.open_title=Open .logdef
 logdef.no_charts=No charts found in this file.
@@ -115,6 +160,8 @@ logdef.invalid_line=Invalid line {number} in {name}
 logdef.min_columns='{name}': choose at least {needed} column(s).
 logdef.choose_columns=Choose columns for at least one chart.
 logdef.save_title=Save as
+logdef.saved_not_active='{name}' was saved, but is not the active configuration for this data file. The charts were not changed.
+logdef.reload_failed=The configuration was saved, but the charts could not be refreshed: {error}
 
 # Formula editor
 formula.title=Edit formulas

@@ -13,12 +13,15 @@ import matplotlib
 matplotlib.use("TkAgg")
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 import pandas as pd
 from PIL import Image, ImageOps, ImageTk, UnidentifiedImageError
 from tkinter import font as tkfont
 from formulas import apply_formulas, load_formulas, load_funcdefs
+from logdef_format import parse_chart_fields
+from pivots import PERIODS, calculate_pivots, load_pivots, pivot_path
 from i18n import available_languages, current_language, init_language, set_language as apply_language, t
 from settings import get_auto_scale_y, get_last_dir, set_auto_scale_y, set_language, set_last_dir
 import tkinter as tk
@@ -38,6 +41,8 @@ MENU_DIR = CONFIGS_DIR / "Menudefs"
 FORMULA_DIR = CONFIGS_DIR / "Formuladefs"
 FUNCTION_DIR = CONFIGS_DIR / "Functiedefs"
 HELPDEF_DIR = CONFIGS_DIR / "Helpdefs"
+PIVOT_DIR = CONFIGS_DIR / "Pivotdefs"
+PIVOT_FORMULA_DIR = CONFIGS_DIR / "PivotFormuladefs"
 HELPDEF_PATH = HELPDEF_DIR / "Campbell_Sci.helpdef"
 HELP_IMAGE_PATH = HELPDEF_DIR / "Meettoren.jpg"
 
@@ -179,11 +184,11 @@ def _read_preamble_lines(file_path: str | Path) -> list[str]:
     return lines[:header_index] if header_index else []
 
 
-def load_chart_config(
+def chart_config_path(
     logger: str,
     config_dir: str | Path = LOGDEF_DIR,
     location: str | None = None,
-) -> list[dict[str, Any]]:
+) -> Path | None:
     config_path = Path(config_dir)
     candidates = []
     if location:
@@ -191,7 +196,15 @@ def load_chart_config(
     candidates.append(config_path / f"{logger.upper()}.logdef")
     if logger.upper() == "BRAS":
         candidates.append(config_path / "BM.logdef")
-    path = next((candidate for candidate in candidates if candidate.is_file()), None)
+    return next((candidate for candidate in candidates if candidate.is_file()), None)
+
+
+def load_chart_config(
+    logger: str,
+    config_dir: str | Path = LOGDEF_DIR,
+    location: str | None = None,
+) -> list[dict[str, Any]]:
+    path = chart_config_path(logger, config_dir, location)
     if path is None:
         return []
     charts = []
@@ -199,10 +212,8 @@ def load_chart_config(
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
-        fields = [field.strip() for field in line.split(";")]
-        if len(fields) != 7:
-            raise ValueError(t("err.invalid_logdef_line", name=path.name, line=line_number))
-        name, chart_type, columns, minimum, maximum, number_format, tab_color = fields
+        fields = parse_chart_fields(line, path.name, line_number)
+        name, chart_type, columns, minimum, maximum, number_format, tab_color = fields[:7]
         charts.append({
             "name": name,
             "type": chart_type.lower(),
@@ -211,6 +222,7 @@ def load_chart_config(
             "maximum": float(maximum) if maximum else None,
             "number_format": number_format or "0.0",
             "tab_color": tab_color,
+            "trend": fields[7] if len(fields) == 8 else "",
         })
     return charts
 
@@ -436,6 +448,9 @@ class CampbellViewer:
         self.chart_data = data
         self.calc_columns: list[str] = []
         self.formula_errors: list[str] = []
+        self.pivot_frames: dict[str, pd.DataFrame] = {}
+        self.pivot_columns: dict[str, str] = {}
+        self.pivot_page = 0
         self._data_changed = False
         self.figures: list[Figure] = []
         self.canvases: list[FigureCanvasTkAgg] = []
@@ -522,6 +537,7 @@ class CampbellViewer:
         style.configure("TButton", padding=(10, 6), font=("Segoe UI", 9))
         style.configure("TNotebook", background="#F3F5F7", borderwidth=0)
         style.configure("TNotebook.Tab", padding=(0, 0), font=("Segoe UI", 9))
+        style.layout("Scroll.TNotebook.Tab", [])
         style.configure("Treeview", rowheight=24, font=("Segoe UI", 9), background="#FFFFFF", fieldbackground="#FFFFFF")
         style.configure("Treeview.Heading", font=("Segoe UI", 9, "bold"))
 
@@ -531,6 +547,7 @@ class CampbellViewer:
         ttk.Button(toolbar, text=t("toolbar.open_data"), command=self._choose_another_file).pack(side="left")
         ttk.Button(toolbar, text=t("toolbar.logdef_editor"), command=self._open_logdef_editor).pack(side="left", padx=(8, 0))
         ttk.Button(toolbar, text=t("toolbar.formula_editor"), command=self._open_formula_editor).pack(side="left", padx=(8, 0))
+        ttk.Button(toolbar, text=t("pivot.editor"), command=self._open_pivot_editor).pack(side="left", padx=(8, 0))
         ttk.Button(toolbar, text=t("toolbar.help"), command=self._open_help).pack(side="left", padx=(8, 0))
         self.auto_scale_y = tk.BooleanVar(value=get_auto_scale_y())
         ttk.Checkbutton(
@@ -550,12 +567,23 @@ class CampbellViewer:
         ttk.Label(toolbar, text=t("toolbar.language"), style="Toolbar.TLabel").pack(side="right", padx=(10, 4))
         self.status = tk.StringVar(value=t("status.rows_logger", rows=f"{len(self.data):,}", logger=self.logger))
         ttk.Label(toolbar, textvariable=self.status, style="Toolbar.TLabel").pack(side="right")
-        self.notebook = ttk.Notebook(self.root)
+        tabbar = ttk.Frame(self.root)
+        tabbar.pack(fill="x", padx=10)
+        ttk.Button(tabbar, text="<", width=3, command=lambda: self.tab_canvas.xview_scroll(-2, "units")).pack(side="left")
+        ttk.Button(tabbar, text=">", width=3, command=lambda: self.tab_canvas.xview_scroll(2, "units")).pack(side="right")
+        self.tab_canvas = tk.Canvas(tabbar, height=38, highlightthickness=0, background="#F3F5F7")
+        self.tab_canvas.pack(side="left", fill="x", expand=True)
+        self.tab_strip = ttk.Frame(self.tab_canvas)
+        self.tab_buttons: list[tk.Button] = []
+        self.tab_canvas.create_window(0, 0, window=self.tab_strip, anchor="nw")
+        self.tab_strip.bind("<Configure>", lambda _event: self.tab_canvas.configure(scrollregion=self.tab_canvas.bbox("all")))
+        self.tab_canvas.bind("<MouseWheel>", lambda event: self.tab_canvas.xview_scroll(-1 if event.delta > 0 else 1, "units"))
+        self.notebook = ttk.Notebook(self.root, style="Scroll.TNotebook")
         self.notebook.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         footer = ttk.Frame(self.root, padding=(10, 3))
         footer.pack(fill="x", side="bottom")
         ttk.Label(footer, text=t("footer.author")).pack(side="right")
-        self._shell_widgets = [toolbar, self.notebook, footer]
+        self._shell_widgets = [toolbar, tabbar, self.notebook, footer]
 
     def _change_language(self, index: int) -> None:
         code = self._language_codes[index]
@@ -597,7 +625,9 @@ class CampbellViewer:
         self._add_data_tab()
         self._compute_calc()
         self._add_data2_tab()
-        specs = load_chart_config(self.logger, location=self.location)
+        self._compute_pivots()
+        self._add_pivot_tab()
+        specs = load_chart_config(self.logger, LOGDEF_DIR, location=self.location)
         if not specs:
             specs = _fallback_charts(self.chart_data)
         if not specs:
@@ -609,8 +639,10 @@ class CampbellViewer:
                 image=self._make_tab_image(t("tab.charts")),
                 compound="center",
             )
+            self._refresh_tab_strip()
             return
         headers = _header_lookup(self.chart_data)
+        headers.update({name.upper(): name for name in self.pivot_columns})
         used_names: set[str] = set()
         for index, spec in enumerate(specs):
             name = spec["name"] or t("chart.default_name", number=index + 1)
@@ -630,8 +662,142 @@ class CampbellViewer:
                 self._draw_chart(page, chart_spec, headers, self.chart_data)
             except (KeyError, ValueError) as exc:
                 ttk.Label(page, text=t("chart.cannot_build", error=exc), padding=24).pack(anchor="w")
-        if len(self.notebook.tabs()) > 2:
-            self.notebook.select(self.notebook.tabs()[2])
+        self._refresh_tab_strip()
+        if len(self.notebook.tabs()) > 3:
+            self.notebook.select(self.notebook.tabs()[3])
+
+    def _refresh_tab_strip(self) -> None:
+        for child in self.tab_strip.winfo_children():
+            child.destroy()
+        self.tab_buttons.clear()
+        for tab in self.notebook.tabs():
+            options = self.notebook.tab(tab)
+            button = tk.Button(
+                self.tab_strip, text=options["text"], image=options["image"] or "",
+                compound="center", relief="raised", borderwidth=1,
+                command=lambda target=tab: self.notebook.select(target),
+            )
+            button.pack(side="left")
+            self.tab_buttons.append(button)
+            button.bind("<MouseWheel>", lambda event: self.tab_canvas.xview_scroll(-1 if event.delta > 0 else 1, "units"))
+        self._highlight_tab()
+
+    def _highlight_tab(self) -> None:
+        selected = self.notebook.select()
+        for tab, button in zip(self.notebook.tabs(), self.tab_buttons):
+            button.configure(relief="sunken" if tab == selected else "raised")
+            if tab == selected:
+                self.root.after_idle(lambda target=button: self._show_selected_tab(target))
+
+    def _show_selected_tab(self, button: tk.Widget) -> None:
+        if not button.winfo_exists() or not self.tab_canvas.winfo_exists():
+            return
+        self.tab_strip.update_idletasks()
+        width = self.tab_canvas.winfo_width()
+        total = self.tab_strip.winfo_width()
+        if width < 2 or total <= width:
+            return
+        left = self.tab_canvas.canvasx(0)
+        start = button.winfo_x()
+        end = start + button.winfo_width()
+        if start < left:
+            self.tab_canvas.xview_moveto(start / total)
+        elif end > left + width:
+            self.tab_canvas.xview_moveto((end - width) / total)
+
+    def _compute_pivots(self) -> None:
+        self.pivot_frames = {}
+        self.pivot_bases: dict[str, pd.DataFrame] = {}
+        self.pivot_columns = {}
+        errors: list[str] = []
+        try:
+            definitions = load_pivots(pivot_path(self.logger, self.location, PIVOT_DIR))
+            self.pivot_frames = calculate_pivots(self.chart_data, self.header_row_count, definitions)
+            self.pivot_bases = {period: frame.copy() for period, frame in self.pivot_frames.items()}
+            for period, frame in self.pivot_frames.items():
+                formulas = load_formulas(self.logger, self.location, PIVOT_FORMULA_DIR / period)
+                macros = load_funcdefs(FUNCTION_DIR)
+                calculated, _names, formula_errors = apply_formulas(frame, formulas, 0, macros)
+                errors.extend(f"{t('pivot.period.' + period)}: {error}" for error in formula_errors)
+                self.pivot_frames[period] = calculated
+            existing = {str(c).casefold() for c in self.chart_data.columns}
+            for period, frame in self.pivot_frames.items():
+                for column in frame.columns[1:]:
+                    if str(column).casefold() in existing:
+                        raise ValueError(t("pivot.duplicate", name=column))
+                    existing.add(str(column).casefold())
+                    self.pivot_columns[str(column)] = period
+        except (OSError, ValueError) as exc:
+            self.pivot_frames = {}
+            self.pivot_bases = {}
+            self.pivot_columns = {}
+            errors.append(str(exc))
+        if errors:
+            self.root.after(200, lambda: messagebox.showwarning(t("pivot.editor"), "\n".join(errors), parent=self.root))
+
+    def _add_pivot_tab(self) -> None:
+        page = ttk.Frame(self.notebook, padding=10)
+        self.notebook.add(page, text=t("tab.pivot"), image=self._make_tab_image(t("tab.pivot")), compound="center")
+        page.columnconfigure(0, weight=1)
+        page.rowconfigure(1, weight=1)
+        controls = ttk.Frame(page)
+        controls.grid(row=0, column=0, columnspan=2, sticky="ew")
+        ttk.Label(controls, text=t("pivot.interval")).pack(side="left")
+        self.pivot_periods = [period for period in PERIODS if period in self.pivot_frames]
+        self.pivot_choice = ttk.Combobox(controls, values=[t("pivot.period." + p) for p in self.pivot_periods], state="readonly", width=15)
+        self.pivot_choice.pack(side="left", padx=8)
+        self.pivot_choice.bind("<<ComboboxSelected>>", self._change_pivot_period)
+        ttk.Button(controls, text=t("pivot.formulas"), command=self._open_pivot_formulas).pack(side="left", padx=8)
+        self.pivot_table = ttk.Treeview(page, show="headings", selectmode="none")
+        ybar = ttk.Scrollbar(page, orient="vertical", command=self.pivot_table.yview)
+        xbar = ttk.Scrollbar(page, orient="horizontal", command=self.pivot_table.xview)
+        self.pivot_table.configure(yscrollcommand=ybar.set, xscrollcommand=xbar.set)
+        self.pivot_table.grid(row=1, column=0, sticky="nsew")
+        ybar.grid(row=1, column=1, sticky="ns")
+        xbar.grid(row=2, column=0, sticky="ew")
+        self.pivot_selection = ReadOnlyCellSelection(self.pivot_table)
+        bottom = ttk.Frame(page)
+        bottom.grid(row=3, column=0, columnspan=2, sticky="ew")
+        self.pivot_page_label = tk.StringVar()
+        ttk.Button(bottom, text=t("button.previous"), command=lambda: self._change_pivot_page(-1)).pack(side="left")
+        ttk.Label(bottom, textvariable=self.pivot_page_label).pack(side="left", padx=12)
+        ttk.Button(bottom, text=t("button.next"), command=lambda: self._change_pivot_page(1)).pack(side="left")
+        if self.pivot_periods:
+            self.pivot_choice.current(0)
+        self._change_pivot_period()
+
+    def _change_pivot_period(self, _event: object = None) -> None:
+        self.pivot_page = 0
+        self._show_pivot_page()
+
+    def _show_pivot_page(self) -> None:
+        table = self.pivot_table
+        self.pivot_selection.set_cursor(None)
+        table.delete(*table.get_children())
+        index = self.pivot_choice.current()
+        if index < 0:
+            table.configure(columns=())
+            self.pivot_page_label.set(t("pivot.empty"))
+            return
+        frame = self.pivot_frames[self.pivot_periods[index]]
+        columns = list(frame.columns)
+        table.configure(columns=columns)
+        for column in columns:
+            table.heading(column, text=column)
+            table.column(column, width=max(120, min(220, len(str(column)) * 9)), minwidth=80, stretch=False)
+        start = self.pivot_page * PAGE_SIZE
+        end = min(len(frame), start + PAGE_SIZE)
+        for row in frame.iloc[start:end].itertuples(index=False, name=None):
+            table.insert("", "end", values=["" if pd.isna(value) else f"{value:.6g}" if isinstance(value, float) else str(value) for value in row])
+        self.pivot_page_label.set(t("page.label", first=f"{start + 1 if end else 0:,}", last=f"{end:,}", count=f"{len(frame):,}", page=self.pivot_page + 1, pages=max(1, math.ceil(len(frame) / PAGE_SIZE))))
+
+    def _change_pivot_page(self, direction: int) -> None:
+        index = self.pivot_choice.current()
+        if index < 0:
+            return
+        count = len(self.pivot_frames[self.pivot_periods[index]])
+        self.pivot_page = max(0, min(max(0, math.ceil(count / PAGE_SIZE) - 1), self.pivot_page + direction))
+        self._show_pivot_page()
 
     def _compute_calc(self) -> None:
         errors: list[str] = []
@@ -720,6 +886,7 @@ class CampbellViewer:
     def _clear_tabs(self) -> None:
         for tab in self.notebook.tabs():
             self.notebook.forget(tab)
+            self.root.nametowidget(tab).destroy()
         self._tab_images.clear()
         for figure in self.figures:
             plt.close(figure)
@@ -728,6 +895,7 @@ class CampbellViewer:
         self.chart_axes.clear()
 
     def _on_notebook_tab_changed(self, _event: tk.Event) -> None:
+        self._highlight_tab()
         selected_tab = self.notebook.select()
         if not selected_tab:
             return
@@ -740,12 +908,12 @@ class CampbellViewer:
         self._finish_cell_edit(save=True)
         if not self._data_changed:
             return
-        self._compute_calc()
-        self._show_data2_page()
-        for canvas, axes_list, _is_wind_rose in self.chart_axes:
-            self._restore_chart(canvas, axes_list)
-            canvas.draw_idle()
         self._data_changed = False
+        selected_index = tabs.index(selected_tab)
+        self._populate_tabs()
+        tabs = self.notebook.tabs()
+        self.notebook.select(tabs[min(selected_index, len(tabs) - 1)])
+        self._last_selected_tab = self.notebook.select()
 
     def _add_data_tab(self) -> None:
         page = ttk.Frame(self.notebook, padding=10)
@@ -1138,6 +1306,10 @@ class CampbellViewer:
             self._draw_scatter(axes, spec, headers, data)
             axes_list = [axes]
             is_wind_rose = False
+        elif chart_type in {"bar_grouped", "bar_range"}:
+            self._draw_special_bars(axes, spec, headers, data)
+            axes_list = [axes]
+            is_wind_rose = False
         else:
             axes_list = self._draw_lines(figure, axes, spec, headers, data)
             is_wind_rose = False
@@ -1183,10 +1355,15 @@ class CampbellViewer:
             return
         row_index, column = target
         try:
-            position = self.chart_data.index.get_loc(row_index)
-            value = self.chart_data.iloc[position][column]
-            stamp = self.chart_data.iloc[position, 0]
-        except (KeyError, TypeError):
+            if column in self.pivot_columns:
+                frame = self.pivot_frames[self.pivot_columns[column]]
+                value = frame.loc[row_index, column]
+                stamp = frame.loc[row_index, frame.columns[0]]
+            else:
+                position = self.chart_data.index.get_loc(row_index)
+                value = self.chart_data.iloc[position][column]
+                stamp = self.chart_data.iloc[position, 0]
+        except (KeyError, TypeError, IndexError):
             self._hide_hover_tip()
             return
         value_text = "" if pd.isna(value) else (f"{value:.6g}" if isinstance(value, float) else str(value))
@@ -1221,7 +1398,12 @@ class CampbellViewer:
         click = (event.x, height - event.y)
         nearest = None
         nearest_distance = float("inf")
+        bar_target = None
         for axes in axes_list:
+            for patch in axes.patches:
+                target = getattr(patch, "_campbell_target", None)
+                if target is not None and patch.contains_point(click):
+                    bar_target = target
             for line in axes.get_lines():
                 points = line.get_xydata()
                 if not len(points) or not hasattr(line, "_campbell_row_indices"):
@@ -1248,7 +1430,7 @@ class CampbellViewer:
                     rows = points._campbell_row_indices
                     nearest = (rows[point_index], points._campbell_column)
                     nearest_distance = distance
-        return nearest if nearest_distance <= 225 else None
+        return nearest if nearest_distance <= 225 else bar_target
 
     def _run_chart_action(self, action: str, canvas: FigureCanvasTkAgg, axes_list: list[Any]) -> None:
         if action == "go_to_data":
@@ -1266,6 +1448,19 @@ class CampbellViewer:
             return
         self._chart_origin_tab = str(canvas.get_tk_widget().master)
         row_index, column = target
+        if column in self.pivot_columns:
+            period = self.pivot_columns[column]
+            frame = self.pivot_frames[period]
+            position = int(frame.index.get_indexer([row_index])[0])
+            self.pivot_choice.current(self.pivot_periods.index(period))
+            self.pivot_page = position // PAGE_SIZE
+            self._show_pivot_page()
+            self.notebook.select(self.notebook.tabs()[2])
+            item = self.pivot_table.get_children()[position % PAGE_SIZE]
+            self.pivot_selection.set_cursor(item, f"#{list(frame.columns).index(column) + 1}")
+            self.pivot_table.see(item)
+            self.pivot_table.focus_set()
+            return
         try:
             row_position = self.data.index.get_loc(row_index)
         except KeyError:
@@ -1415,9 +1610,111 @@ class CampbellViewer:
         elif spec["type"] == "scatter":
             self._draw_scatter(axes, spec, headers, self.chart_data)
             restored_axes = [axes]
+        elif spec["type"] in {"bar_grouped", "bar_range"}:
+            self._draw_special_bars(axes, spec, headers, self.chart_data)
+            restored_axes = [axes]
         else:
             restored_axes = self._draw_lines(figure, axes, spec, headers, self.chart_data)
         axes_list[:] = restored_axes
+
+    def _draw_special_bars(
+        self, axes: Any, spec: dict[str, Any], headers: dict[str, str], data: pd.DataFrame,
+    ) -> None:
+        columns = spec["columns"]
+        if len(columns) < 2:
+            raise ValueError(t("err.line_chart_needs_columns"))
+        if spec["type"] == "bar_range" and len(columns) != 4:
+            raise ValueError(t("chart.range_columns"))
+        x_column, _ = _resolve_header(headers, columns[0])
+        series: list[tuple[str, pd.DataFrame, pd.Series, pd.Series]] = []
+        is_date: bool | None = None
+        for configured in columns[1:]:
+            column, secondary = _resolve_header(headers, configured)
+            if secondary:
+                raise ValueError(t("chart.bar_secondary"))
+            period = self.pivot_columns.get(column)
+            frame = self.pivot_frames[period] if period else data
+            if period:
+                x = pd.to_datetime(frame.iloc[:, 0], errors="coerce")
+                dates = True
+            else:
+                x, dates = _x_values(data[x_column])
+                parsed = pd.to_datetime(data[x_column].iloc[self.header_row_count:], format="mixed", errors="coerce")
+                if len(parsed) and parsed.notna().sum() >= max(1, math.ceil(len(parsed) * 0.5)):
+                    x = pd.to_datetime(data[x_column], format="mixed", errors="coerce")
+                    dates = True
+            if is_date is not None and dates != is_date:
+                raise ValueError(t("pivot.chart_needs_time"))
+            is_date = dates
+            series.append((column, frame, x, pd.to_numeric(frame[column], errors="coerce")))
+
+        if spec["type"] == "bar_range" and any(item[1] is not series[0][1] for item in series[1:]):
+            raise ValueError(t("chart.range_period"))
+        positions: list[float] = []
+        for _, _, x, y in series:
+            valid = x.notna() & y.notna()
+            values = mdates.date2num(x[valid].to_numpy()) if is_date else x[valid].to_numpy()
+            positions.extend(float(value) for value in values if math.isfinite(float(value)))
+        unique = sorted(set(positions))
+        if not unique:
+            raise ValueError(t("err.no_plottable_data"))
+        spacing = min((b - a for a, b in zip(unique, unique[1:])), default=1.0)
+        width = spacing * 0.8
+        if spec["type"] == "bar_range":
+            frame = series[0][1]
+            x = series[0][2]
+            low, mean, high = (item[3] for item in series)
+            valid = x.notna() & low.notna() & mean.notna() & high.notna()
+            if not valid.any():
+                raise ValueError(t("err.no_plottable_data"))
+            invalid = valid & ((low > mean) | (mean > high))
+            if invalid.any():
+                position = int(invalid.to_numpy().nonzero()[0][0])
+                raise ValueError(t(
+                    "chart.range_order_details",
+                    time=x.iloc[position],
+                    minimum=series[0][0], min_value=f"{low.iloc[position]:.6g}",
+                    mean=series[1][0], mean_value=f"{mean.iloc[position]:.6g}",
+                    maximum=series[2][0], max_value=f"{high.iloc[position]:.6g}",
+                ))
+            xs = mdates.date2num(x[valid].to_numpy()) if is_date else x[valid].to_numpy()
+            rows = list(frame.index[valid])
+            lower = axes.bar(xs, mean[valid] - low[valid], bottom=low[valid], width=width,
+                             color=LINE_COLORS[0], label=f"{series[0][0]} - {series[1][0]}")
+            upper = axes.bar(xs, high[valid] - mean[valid], bottom=mean[valid], width=width,
+                             color=LINE_COLORS[1], label=f"{series[1][0]} - {series[2][0]}")
+            for patch, row in zip(lower, rows):
+                patch.sticky_edges.y.clear()
+                patch._campbell_target = (row, series[0][0])
+            for patch, row in zip(upper, rows):
+                patch.sticky_edges.y.clear()
+                patch._campbell_target = (row, series[2][0])
+            axes.scatter(xs, mean[valid], color=LINE_COLORS[2], marker="_", s=70, zorder=3, label=series[1][0])
+            points = axes.collections[-1]
+            points._campbell_row_indices = rows
+            points._campbell_column = series[1][0]
+            zero_line = axes.axhline(0, color="#263442", linewidth=1.5, zorder=5)
+            zero_line._campbell_zero_line = True
+            axes.autoscale_view(scalex=False, scaley=True)
+        else:
+            count = len(series)
+            for index, (column, frame, x, y) in enumerate(series):
+                valid = x.notna() & y.notna()
+                if not valid.any():
+                    continue
+                xs = mdates.date2num(x[valid].to_numpy()) if is_date else x[valid].to_numpy()
+                offset = (index - (count - 1) / 2) * width / count
+                bars = axes.bar(xs + offset, y[valid], width=width / count,
+                                color=LINE_COLORS[index % len(LINE_COLORS)], label=column)
+                for patch, row in zip(bars, frame.index[valid]):
+                    patch._campbell_target = (row, column)
+        axes.set_xlabel(x_column)
+        axes.set_ylabel(t("axis.value"))
+        if is_date:
+            axes.xaxis.set_major_formatter(mdates.ConciseDateFormatter(axes.xaxis.get_major_locator()))
+        if spec["minimum"] is not None or spec["maximum"] is not None:
+            axes.set_ylim(bottom=spec["minimum"], top=spec["maximum"])
+        axes.legend(loc="upper left", ncol=min(4, len(series)), frameon=False, fontsize=8)
 
     def _draw_lines(
         self,
@@ -1432,6 +1729,14 @@ class CampbellViewer:
             raise ValueError(t("err.line_chart_needs_columns"))
         x_column, _ = _resolve_header(headers, columns[0])
         x_values, is_date = _x_values(data[x_column])
+        if not is_date and any(
+            headers.get((name[:-10] if name.lower().endswith("@secondary") else name).strip().upper()) in self.pivot_columns
+            for name in columns[1:]
+        ):
+            dates = pd.to_datetime(data[x_column], format="mixed", errors="coerce")
+            measurements = dates.iloc[self.header_row_count:]
+            if len(measurements) and measurements.notna().sum() >= max(1, math.ceil(len(measurements) * 0.5)):
+                x_values, is_date = dates, True
         height_column: str | None = None
         height_values: list[Any] = []
         for configured_column in columns[1:]:
@@ -1463,7 +1768,15 @@ class CampbellViewer:
                 continue
             if column.upper() == "HOOGTE":
                 continue
-            y_values = pd.to_numeric(data[column], errors="coerce")
+            pivot_period = self.pivot_columns.get(column)
+            series_data = self.pivot_frames[pivot_period] if pivot_period else data
+            if pivot_period:
+                if not is_date:
+                    raise ValueError(t("pivot.chart_needs_time"))
+                series_x = pd.to_datetime(series_data.iloc[:, 0], errors="coerce")
+            else:
+                series_x = x_values
+            y_values = pd.to_numeric(series_data[column], errors="coerce")
             target = axes
             if secondary:
                 if secondary_axes is None:
@@ -1471,9 +1784,9 @@ class CampbellViewer:
                     secondary_axes.spines["top"].set_visible(False)
                     secondary_axes.tick_params(colors="#344454", labelsize=9)
                 target = secondary_axes
-            chart_heights = height_values or [None]
+            chart_heights = (height_values or [None]) if not pivot_period else [None]
             for height_index, height_value in enumerate(chart_heights):
-                valid = x_values.notna() & y_values.notna()
+                valid = series_x.notna() & y_values.notna()
                 label = column
                 if height_column is not None and height_value is not None:
                     matches_height = data[height_column].eq(height_value).fillna(False)
@@ -1486,21 +1799,23 @@ class CampbellViewer:
                 color_index = series_index * len(chart_heights) + height_index
                 color = LINE_COLORS[color_index % len(LINE_COLORS)]
                 if spec["type"] == "bar":
-                    xs = x_values[valid]
+                    xs = series_x[valid]
                     step = xs.diff().median()
-                    width = step if pd.notna(step) and step else 1
                     if is_date:
+                        width = step if pd.notna(step) and step else pd.Timedelta(days=1)
                         width = mdates.date2num(xs.iloc[0] + width) - mdates.date2num(xs.iloc[0])
+                    else:
+                        width = step if pd.notna(step) and step else 1
                     line = target.bar(xs, y_values[valid], width=width * 0.8, color=color, label=label)
                 else:
                     line, = target.plot(
-                        x_values[valid],
+                        series_x[valid],
                         y_values[valid],
                         color=color,
                         linewidth=2.4 if secondary else 0.9,
                         label=label,
                     )
-                line._campbell_row_indices = list(data.index[valid])
+                line._campbell_row_indices = list(series_data.index[valid])
                 line._campbell_column = column
                 legend_handles.append(line)
                 plotted += 1
@@ -1541,17 +1856,51 @@ class CampbellViewer:
             raise ValueError(t("err.scatter_needs_two"))
         y_column, _ = _resolve_header(headers, spec["columns"][0])
         x_column, _ = _resolve_header(headers, spec["columns"][1])
-        x_values = pd.to_numeric(data[x_column], errors="coerce")
-        y_values = pd.to_numeric(data[y_column], errors="coerce")
-        valid = x_values.notna() & y_values.notna()
+        x_period = self.pivot_columns.get(x_column)
+        y_period = self.pivot_columns.get(y_column)
+        x_frame = self.pivot_frames[x_period] if x_period else data
+        y_frame = self.pivot_frames[y_period] if y_period else data
+        if x_frame is y_frame:
+            x_values = pd.to_numeric(x_frame[x_column], errors="coerce")
+            y_values = pd.to_numeric(y_frame[y_column], errors="coerce")
+            row_indices = y_frame.index
+        else:
+            x_times = pd.to_datetime(x_frame.iloc[:, 0], format="mixed", errors="coerce")
+            y_times = pd.to_datetime(y_frame.iloc[:, 0], format="mixed", errors="coerce")
+            x_points = pd.DataFrame({"time": x_times, "x": pd.to_numeric(x_frame[x_column], errors="coerce")}).dropna(subset=["time"])
+            y_points = pd.DataFrame({"time": y_times, "y": pd.to_numeric(y_frame[y_column], errors="coerce"), "row": y_frame.index}).dropna(subset=["time"])
+            matched = y_points.merge(x_points, on="time", how="inner")
+            x_values, y_values, row_indices = matched["x"], matched["y"], matched["row"]
+        valid = x_values.notna() & y_values.notna() & np.isfinite(x_values) & np.isfinite(y_values)
         points = axes.scatter(x_values[valid], y_values[valid], s=10, alpha=0.55, color=LINE_COLORS[0], edgecolors="none")
-        points._campbell_row_indices = list(data.index[valid])
+        points._campbell_row_indices = list(row_indices[valid])
         points._campbell_column = y_column
         axes.set_xlabel(x_column)
         axes.set_ylabel(y_column)
         axes.grid(True, color="#DCE2E8", linewidth=0.7)
         if not valid.any():
             raise ValueError(t("err.scatter_no_numeric"))
+        if spec.get("trend") == "linear":
+            x = x_values[valid].to_numpy(dtype=float)
+            y = y_values[valid].to_numpy(dtype=float)
+            if len(x) < 2 or np.all(x == x[0]):
+                axes.text(0.02, 0.98, t("chart.trend_insufficient"), transform=axes.transAxes,
+                          va="top", fontsize=9, color="#8A5A00")
+                return
+            centered_x = x - x.mean()
+            centered_y = y - y.mean()
+            slope = float(np.dot(centered_x, centered_y) / np.dot(centered_x, centered_x))
+            intercept = float(y.mean() - slope * x.mean())
+            xs = np.array([x.min(), x.max()])
+            axes.plot(xs, slope * xs + intercept, color="#C00000", linewidth=1.5)
+            residuals = y - (slope * x + intercept)
+            total = float(np.dot(centered_y, centered_y))
+            r2 = 1 - float(np.dot(residuals, residuals)) / total if total else None
+            equation = f"y = {slope:.6g}x {intercept:+.6g}"
+            r2_text = f"{r2:.6g}" if r2 is not None else t("chart.trend_undefined")
+            axes.text(0.02, 0.98, f"{equation}\nR² = {r2_text}", transform=axes.transAxes,
+                      va="top", fontsize=9, color="#7B0000",
+                      bbox={"facecolor": "white", "alpha": 0.8, "edgecolor": "none"})
 
     def _draw_wind_rose(
         self,
@@ -1564,7 +1913,9 @@ class CampbellViewer:
         if not spec["columns"]:
             raise ValueError(t("err.no_wind_column"))
         column, _ = _resolve_header(headers, spec["columns"][0])
-        directions = pd.to_numeric(data[column], errors="coerce").dropna().mod(360)
+        period = self.pivot_columns.get(column)
+        frame = self.pivot_frames[period] if period else data
+        directions = pd.to_numeric(frame[column], errors="coerce").dropna().mod(360)
         if directions.empty:
             raise ValueError(t("err.no_wind_values"))
         bins = 16
@@ -1616,6 +1967,8 @@ class CampbellViewer:
             left, right = axes.get_xlim()
             low, high = math.inf, -math.inf
             for line in axes.get_lines():
+                if getattr(line, "_campbell_zero_line", False):
+                    continue
                 points = line.get_xydata()
                 if not len(points):
                     continue
@@ -1624,6 +1977,23 @@ class CampbellViewer:
                 values = values[~(values != values)]
                 if len(values):
                     low, high = min(low, float(values.min())), max(high, float(values.max()))
+            for patch in axes.patches:
+                if hasattr(patch, "_campbell_target"):
+                    x = patch.get_x()
+                    if x + patch.get_width() >= left and x <= right:
+                        bottom = patch.get_y()
+                        top = bottom + patch.get_height()
+                        low, high = min(low, bottom, top), max(high, bottom, top)
+            for points in axes.collections:
+                if hasattr(points, "_campbell_row_indices"):
+                    offsets = points.get_offsets()
+                    if len(offsets):
+                        visible = offsets[(offsets[:, 0] >= left) & (offsets[:, 0] <= right), 1]
+                        visible = visible[np.isfinite(visible)]
+                        if len(visible):
+                            low, high = min(low, float(visible.min())), max(high, float(visible.max()))
+            if spec.get("type") == "bar_range" and math.isfinite(low):
+                low, high = min(low, 0), max(high, 0)
             if not math.isfinite(low):
                 continue
             margin = (high - low) * 0.05 or abs(high) * 0.05 or 1.0
@@ -1684,11 +2054,54 @@ class CampbellViewer:
         from logdef_editor import LogdefEditor
         editor = LogdefEditor(
             self.root,
-            [str(c) for c in self.chart_data.columns],
+            [str(c) for c in self.chart_data.columns] + list(self.pivot_columns),
             self.logger,
             LOGDEF_DIR,
             location=self.location,
+            on_saved=self._reload_logdef,
         )
+        editor.iconbitmap(str(application_icon_path()))
+
+    def _reload_logdef(self, path: Path) -> None:
+        active = chart_config_path(self.logger, LOGDEF_DIR, self.location)
+        if active is None or active.resolve() != path.resolve():
+            messagebox.showwarning(
+                t("logdef.title_new"),
+                t("logdef.saved_not_active", name=path.name),
+                parent=self.root,
+            )
+            return
+        self._finish_cell_edit(save=True)
+        try:
+            self._reload_formulas()
+        except (OSError, ValueError, tk.TclError) as exc:
+            messagebox.showerror(t("logdef.title_new"), t("logdef.reload_failed", error=exc), parent=self.root)
+            return
+        self._data_changed = False
+        self.status.set(t("status.saved", name=path.name))
+
+    def _open_pivot_editor(self) -> None:
+        from pivot_editor import PivotEditor
+        editor = PivotEditor(
+            self.root, self.chart_data, self.header_row_count,
+            pivot_path(self.logger, self.location, PIVOT_DIR), self._reload_formulas,
+        )
+        if editor.winfo_exists():
+            editor.iconbitmap(str(application_icon_path()))
+
+    def _open_pivot_formulas(self) -> None:
+        index = self.pivot_choice.current()
+        if index < 0:
+            messagebox.showinfo(t("pivot.formulas"), t("pivot.empty"), parent=self.root)
+            return
+        from formula_editor import FormulaEditor
+        period = self.pivot_periods[index]
+        editor = FormulaEditor(
+            self.root, self.pivot_bases[period], 0, self.logger,
+            PIVOT_FORMULA_DIR / period, location=self.location,
+            on_saved=self._reload_formulas, function_dir=FUNCTION_DIR,
+        )
+        editor.title(f"{t('pivot.formulas')} - {t('pivot.period.' + period)}")
         editor.iconbitmap(str(application_icon_path()))
 
     def _open_formula_editor(self) -> None:
@@ -1706,7 +2119,17 @@ class CampbellViewer:
         editor.iconbitmap(str(application_icon_path()))
 
     def _reload_formulas(self) -> None:
+        old_tabs = self.notebook.tabs()
+        selected = self.notebook.select()
+        tab_index = old_tabs.index(selected) if selected in old_tabs else 0
+        choice = self.pivot_choice.current()
+        period = self.pivot_periods[choice] if choice >= 0 else None
         self._populate_tabs()
+        if period in self.pivot_periods:
+            self.pivot_choice.current(self.pivot_periods.index(period))
+            self._change_pivot_period()
+        tabs = self.notebook.tabs()
+        self.notebook.select(tabs[min(tab_index, len(tabs) - 1)])
         self._last_selected_tab = self.notebook.select()
 
     def _open_help(self) -> None:

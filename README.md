@@ -24,6 +24,7 @@ The **Data** tab shows the measurements, the **Calc** tab shows calculated
 columns, and the other tabs show charts from the matching logger configuration.
 If no chart configuration is found, the viewer creates a line chart for each
 numeric measurement column.
+The tab strip can be scrolled with the arrow buttons or the mouse wheel.
 
 Use the mouse wheel over a chart to zoom horizontally. Place the pointer over
 the left or right plot margin and use the wheel to scroll through the
@@ -43,6 +44,23 @@ in `Configs/Logdefs`. The viewer first looks for a logger-and-location
 configuration, then a logger-wide configuration. A graph is split by height
 only when `Hoogte` is explicitly included in that graph's `.logdef`; add
 `@secondary` to a measurement column to plot it on the second Y axis.
+**Save** closes the editor and refreshes charts immediately; existing files are
+saved directly, while new configurations require a file choice. **Save as**
+remains available, but a file outside the active logger/location configuration
+is not automatically applied.
+For scatter charts choose exactly two columns, first Y and then X; this order
+preserves existing configurations. Optionally enable a linear trendline with
+its equation and R². At least two valid points with different X values are
+needed; R² is undefined when Y is constant.
+The **Grouped bars** type displays series side by side; **Min-mean-max bars**
+displays the range from minimum to mean and mean to maximum, with a marker for
+the mean. Add exactly three columns one at a time in minimum, mean, maximum
+order, on the same time basis. Values must satisfy minimum ≤ mean ≤ maximum.
+The dark zero line makes negative values visible. A Pivot mean uses all
+available measurements in the period, not just the minimum and maximum.
+Use **Up** and **Down** below the selected columns to change their order.
+Both types add the time column automatically and leave existing bar charts
+unchanged.
 
 ## Formulas and custom functions
 
@@ -66,6 +84,25 @@ examples.
 Use **Edit custom functions...** to edit `Configs/Functiedefs/Functies.funcdef`.
 Formulas and custom functions are stored in `Configs/Formuladefs` and
 `Configs/Functiedefs`.
+
+## Pivot tables
+
+Use **Pivot Editor** to define named columns from Data or Calc. Choose the
+source, aggregation (mean, sum, minimum, maximum, count or median) and period
+(minute, hour, day, week, month or year). Each result has one timestamp at the
+start of its period; weeks start on Monday. Missing numeric values are excluded
+from the calculations. Definitions are saved per logger and location in
+`Configs/Pivotdefs`, with the same fallback rules as formulas.
+
+The **Pivot** tab shows columns for the selected period, with paging and
+copyable cells. **Pivot Formulas** opens a separate formula editor for that
+period; these formulas operate on the period's Pivot rows rather than on the
+original measurements and are saved in `Configs/PivotFormuladefs`. Pivot columns
+can be reordered with **Up** and **Down** in Pivot Editor. Column names
+must be unique across Data, Calc and all Pivot periods. Pivot and Pivot-formula
+columns are available in LogDef Editor. Line and bar charts use each series'
+own timestamps, so measurements and daily summaries can share a time axis
+without repeating daily values. Scatter plots match series on exact timestamps.
 
 ## Language and configuration
 
