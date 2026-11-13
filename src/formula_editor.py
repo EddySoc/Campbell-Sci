@@ -153,9 +153,40 @@ class FormulaEditor(tk.Toplevel):
         window = tk.Toplevel(self)
         window.title(t("formula.own_functions_title", name=path.name))
         window.geometry("820x520")
+        line_numbers = tk.Text(
+            window, width=4, wrap="none", font=("Consolas", 10), state="disabled",
+            takefocus=False, foreground="#666666", background="#f0f0f0",
+            relief="flat", borderwidth=0, padx=4,
+        )
+        line_numbers.pack(side="left", fill="y", padx=(8, 0), pady=8)
         text = tk.Text(window, wrap="none", font=("Consolas", 10), undo=True)
-        text.pack(fill="both", expand=True, padx=8, pady=8)
+        text.pack(side="left", fill="both", expand=True, padx=(0, 0), pady=8)
+
+        def scroll_editor(*args: str) -> None:
+            text.yview(*args)
+            line_numbers.yview(*args)
+
+        scrollbar = ttk.Scrollbar(window, orient="vertical", command=scroll_editor)
+        scrollbar.pack(side="right", fill="y", padx=(0, 8), pady=8)
+
+        def sync_scroll(first: str, last: str) -> None:
+            scrollbar.set(first, last)
+            line_numbers.yview_moveto(first)
+
+        text.configure(yscrollcommand=sync_scroll)
+
+        def update_line_numbers(_event: tk.Event | None = None) -> None:
+            text.edit_modified(False)
+            line_count = max(1, int(text.index("end-1c").split(".")[0]))
+            width = max(4, len(str(line_count)) + 1)
+            line_numbers.configure(state="normal", width=width)
+            line_numbers.delete("1.0", "end")
+            line_numbers.insert("1.0", "\n".join(str(number) for number in range(1, line_count + 1)))
+            line_numbers.configure(state="disabled")
+
+        text.bind("<<Modified>>", update_line_numbers)
         text.insert("1.0", path.read_text(encoding="utf-8") if path.is_file() else funcdef_header())
+        update_line_numbers()
 
         def save() -> None:
             content = text.get("1.0", "end").rstrip() + "\n"
