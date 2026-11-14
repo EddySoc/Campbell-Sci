@@ -1,18 +1,147 @@
 # Eigen functies en constanten (worden voor alle loggers geladen)
-# Constante:  NAAM = waarde of formule
-# Functie:    NAAM(param1; param2) = formule   (parameters als [param1] of param1)
-# Ingebouwd voor de zon: ZONOP(breedte; lengte; utc), ZONONDER(...), STAP(), UUR()
+# Constante:  NAAM @ Groep = waarde of formule
+# Functie:    NAAM(param1; param2) @ Groep = formule   (parameters als [param1] of param1)
+# Ingebouwd voor de zon: SUNUP(breedte; lengte; utc), SUNDOWN(...), STEP(), UUR()
 
 # Locatie van de meettoren: pas aan! UTC = tijdverschil van de logger-tijd met UTC in uren.
-LAT = 52.2912
-LON = 4.49182
-UTC = 1
+LAT @ Meteo = 52.2912
+LON @ Meteo = 4.49182
+UTC @ Meteo = 1
 
-# Uren zonneschijn per dag: tijd waarop straling >= 120 W/m2 (WMO-drempel)
-ZONUREN(straling) = DAGSOM(IF([straling] >= 120; STAP(); 0))
+# Bladtemperatuur uit de uitgaande infraroodstraling.
+LEAFT(Radiation) @ Meteo = ([Radiation] / 0.0000000567) ^ 0.25 - 273.15
+
+# Uren zonneschijn per meetinterval (WMO-drempel); tel op met een dag-draaitabel.
+ZonInterval(Radiation) @ Meteo = IF([Radiation] >= 120; STEP(); 0)
 
 # Astronomische daglengte in uren
-DAGLENGTE() = ZONONDER(LAT; LON; UTC) - ZONOP(LAT; LON; UTC)
+DAGLENGTE() @ Meteo = SunDown(LAT; LON; UTC) - SunUp(LAT; LON; UTC)
 
-# Zonneschijnduur als percentage van de daglengte
-ZONPERCENTAGE(straling) = 100 * ZONUREN([straling]) / DAGLENGTE()
+# Zonneschijnduur als percentage van de daglengte (op de dag-draaitabel).
+ZonPercentage(Sun_Duration) @ Meteo = 100 * [Sun_Duration] / DagLengte()
+
+# Dauwpunt volgens Magnus: temperatuur in Celsius, relatieve vochtigheid in procent.
+DewPoint(T; RH) @ Meteo = 237.7 * ((17.27 * [T]) / (237.7 + [T]) + LN([RH] / 100)) / (17.27 - ((17.27 * [T]) / (237.7 + [T]) + LN([RH] / 100)))
+
+# Albedo berekening met inkomende en uitgaande infraroodstraling.
+ALBEDO(Reflected_SW;Incoming_SW) @ Meteo = [Reflected_SW] / [Incoming_SW]
+
+# CloudBase resultaat in m boven meetniveau
+CloudBase(Temperature; Dewpoint) @ Meteo = ( ( Temperature - Dewpoint ) / 4.4 ) * 1000
+#CloudBase(Temperature;Dewpoint) @ Meteo = ([Temperature] - [Dewpoint]) * 125
+
+# Vochtigheid en waterdamp ===============================================================================================
+
+# Verzadigingsdampdruk (hPa)
+SatVapor(T) @ Meteo = 6.1078 * 10 ^ ((7.5 * [T]) / (237.3 + [T]))
+
+# Actuele dampdruk (hPa)
+VaporPressure(T;RH) @ Meteo = SatVapor([T]) * [RH] / 100
+
+# Dampdruktekort VPD (hPa)
+VPD(T;RH) @ Meteo = SatVapor([T]) - VaporPressure([T];[RH])
+
+# Absolute vochtigheid (g/m3)
+AbsHumidity(T;RH) @ Meteo = 216.7 * VaporPressure([T];[RH]) / ([T] + 273.15)
+
+# Specifieke vochtigheid (g/kg)
+SpecHumidity(T;RH;Pressure) @ Meteo = 622 * VaporPressure([T];[RH]) / ([Pressure] - 0.378 * VaporPressure([T];[RH]))
+
+# Temperatuur en thermodynamica ==========================================================================================
+
+# Absolute temperatuur (Kelvin)
+TempK(T) @ Meteo = [T] + 273.15
+
+# Temperatuurverschil tussen twee meetpunten
+TempDiff(T1;T2) @ Meteo = [T1] - [T2]
+
+# Temperatuurgradiënt (°C/m)
+TempGradient(T1;T2;Height1;Height2) @ Meteo = ([T2] - [T1]) / ([Height2] - [Height1])
+
+# Potentiële temperatuur (Kelvin)
+PotentialTemp(T;Pressure) @ Meteo = ([T] + 273.15) * (1000 / [Pressure]) ^ 0.286
+
+# Luchtdichtheid =========================================================================================================
+
+# Droge lucht (kg/m3)
+AirDensity(T;Pressure) @ Meteo = ([Pressure] * 100) / (287.05 * ([T] + 273.15))
+
+# Vochtige lucht (kg/m3)
+MoistAirDensity(T;Pressure;VaporPressure) @ Meteo = (([Pressure] - [VaporPressure]) * 100 / (287.05 * ([T] + 273.15))) + ([VaporPressure] * 100 / (461.5 * ([T] + 273.15)))
+
+# Zonnestraling en energie ==============================================================================================
+# Albedo in procent
+ALBEDO_PCT(Reflected_SW;Incoming_SW) @ Meteo = 100 * [Reflected_SW] / [Incoming_SW]
+
+# Netto kortgolvige straling
+NetShortWave(Incoming_SW;Reflected_SW) @ Meteo = [Incoming_SW] - [Reflected_SW]
+
+# Netto langgolvige straling
+NetLongWave(Incoming_LW;Outgoing_LW) @ Meteo = [Incoming_LW] - [Outgoing_LW]
+
+# Netto stralingsbalans
+NetRadiation(Incoming_SW;Reflected_SW;Incoming_LW;Outgoing_LW) @ Meteo = [Incoming_SW] - [Reflected_SW] + [Incoming_LW] - [Outgoing_LW]
+
+# Stralingsenergie per meetinterval
+RadiationEnergy(Radiation) @ Meteo = [Radiation] * STEP() / 1000000
+
+# Windanalyse ===========================================================================================================
+# Windstootfactor
+GustFactor(Gust;Wind) @ Meteo = [Gust] / [Wind]
+
+# Windvectorcomponenten (bij windrichting in graden)
+WindU(Speed;Direction) @ Meteo = -[Speed] * SIN([Direction] * 0.017453293)
+
+WindV(Speed;Direction) @ Meteo = -[Speed] * COS([Direction] * 0.017453293)
+
+# Omrekening m/s naar km/h
+WindKmh(Speed) @ Meteo = [Speed] * 3.6
+
+# Omrekening m/s naar Beaufort (benadering)
+WindBeaufort(Speed) @ Meteo = ([Speed] / 0.836) ^ 1.5
+
+# Luchtkwaliteit =======================================================================================================
+# MW waarden
+CO @ Luchtkwaliteit = 28.01
+CO₂ @ Luchtkwaliteit = 44.01
+NO @ Luchtkwaliteit = 30.01
+NO₂ @ Luchtkwaliteit = 46.01
+O₃ @ Luchtkwaliteit = 48.00
+SO₂ @ Luchtkwaliteit = 64.07
+NH₃ @ Luchtkwaliteit = 17.03
+
+# ppm naar mg/m3
+PPMtoMG(PPM;MW;Pressure;T) @ Luchtkwaliteit = [PPM] * [MW] * [Pressure] / (8.314 * ([T] + 273.15)) * 0.001
+
+# ppb naar ug/m3
+PPBtoUG(PPB;MW;Pressure;T) @ Luchtkwaliteit = [PPB] * [MW] * [Pressure] / (8.314 * ([T] + 273.15)) * 0.001
+
+# Luchtkwaliteitsanalyse ================================================================================================
+# Verschil tussen twee concentraties
+ConcentrationDiff(C1;C2) @ Luchtkwaliteit = [C1] - [C2]
+
+# Verhouding tussen twee concentraties
+ConcentrationRatio(C1;C2) @ Luchtkwaliteit = [C1] / [C2]
+
+# Concentratieverandering in procent
+ConcentrationChange(C1;C2) @ Luchtkwaliteit = 100 * ([C2] - [C1]) / [C1]
+
+# Klimaatanalyse en tijdreeksen =========================================================================================
+# Temperatuuranomalie
+TempAnomaly(Temperature;Reference) @ Klimaat = [Temperature] - [Reference]
+
+# Temperatuurverschil in Fahrenheit
+TempDiffF(T1;T2) @ Klimaat = ([T1] - [T2]) * 1.8
+
+# Graaddagen verwarming STEP(seconds)
+HeatingDegreeDays(Temperature;Base) @ Klimaat = IF([Temperature] < [Base]; ([Base] - [Temperature]) * STEP() / 86400; 0)
+
+# Graaddagen koeling STEP(seconds)
+CoolingDegreeDays(Temperature;Base) @ Klimaat = IF([Temperature] > [Base]; ([Temperature] - [Base]) * STEP() / 86400; 0)
+
+# Analyse
+TempRange(Tmax;Tmin) @ Analyse = [Tmax] - [Tmin]
+
+TempAnomaly(Tmean;Reference) @ Analyse = [Tmean] - [Reference]
+
+VPD_Daily(VPD_Mean) @ Analyse = [VPD_Mean]

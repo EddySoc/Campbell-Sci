@@ -5,13 +5,15 @@ data files.
 
 ## Download and start
 
-1. Download `release/CampBell Viewer.zip` and extract it.
+1. Download the [latest onefile release](https://github.com/EddySoc/Campbell-Sci/releases/latest/download/Campbel.Sci.Viewer.zip) and extract it.
 2. Open the extracted `CampBell Viewer` folder.
 3. Run `Campbel Sci Viewer.exe`.
 
-The viewer creates a `Configs` folder next to the executable on first start.
-Bundled configuration files are copied there only when a file does not already
-exist, so your changes are preserved when you update the application.
+The ZIP includes an example `Configs` folder next to the single-file (onefile)
+executable. Keep it there and adapt its settings to your own data. Missing
+configuration files are restored from the executable on startup without
+overwriting existing files. When updating, preserve your customized `Configs`
+folder rather than replacing it with the examples.
 
 ## Open and view data
 
@@ -56,10 +58,13 @@ The **Grouped bars** type displays series side by side; **Min-mean-max bars**
 displays the range from minimum to mean and mean to maximum, with a marker for
 the mean. Add exactly three columns one at a time in minimum, mean, maximum
 order, on the same time basis. Values must satisfy minimum ≤ mean ≤ maximum.
+**Min-mean-max per sensor** displays one such range bar per sensor, grouped side
+by side at each timestamp. Add each sensor's minimum, mean and maximum columns
+as a consecutive triple.
 The dark zero line makes negative values visible. A Pivot mean uses all
 available measurements in the period, not just the minimum and maximum.
 Use **Up** and **Down** below the selected columns to change their order.
-Both types add the time column automatically and leave existing bar charts
+All bar types add the time column automatically and leave existing bar charts
 unchanged.
 
 ## Formulas and custom functions
@@ -82,8 +87,18 @@ are also available. Open the in-app Help for the full function reference and
 examples.
 
 Use **Edit custom functions...** to edit `Configs/Functiedefs/Functies.funcdef`.
-Formulas and custom functions are stored in `Configs/Formuladefs` and
-`Configs/Functiedefs`.
+Use **Edit function catalog...** to edit function groups, colors and visibility.
+Both text editors provide case-insensitive search with Previous/Next navigation
+and Ctrl+F. Formulas and custom functions are stored in `Configs/Formuladefs`
+and `Configs/Functiedefs`.
+
+## Screenshots
+
+![Function catalog editor with search](screenshots/Function%20Catalog%20Editor.png)
+
+![Custom functions editor with search](screenshots/Custom%20Functions%20editor.png)
+
+![Choose visible functions](screenshots/Choice%20Visible%20functions.dat.png)
 
 ## Pivot tables
 

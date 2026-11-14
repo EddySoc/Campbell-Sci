@@ -93,6 +93,9 @@ axis.percentage=Percentage
 hover.value=Value
 
 # Spreadsheets
+column_search.label=Find column:
+column_search.go=Go to
+column_search.not_found=Column '{name}' does not exist in this table.
 page.label=Rows {first}-{last} of {count} | page {page} of {pages}
 calc.formula_errors=Not all formulas could be calculated:
 calc.errors={count} error(s): {errors}
@@ -127,6 +130,7 @@ logdef.name=Name
 logdef.type=Type
 logdef.type.bar_grouped=Grouped bars
 logdef.type.bar_range=Min-mean-max bars
+logdef.type.bar_grouped_range=Min-mean-max per sensor
 logdef.minimum=Minimum
 logdef.maximum=Maximum
 logdef.number_format=Number format
@@ -140,11 +144,14 @@ logdef.save_as=Save as .logdef...
 logdef.hint_time=Selected columns (time automatically becomes the x axis)
 logdef.hint_grouped=Columns side by side (time automatically becomes the x axis)
 logdef.hint_range=Add one at a time: minimum, mean, maximum (same time basis)
+logdef.hint_grouped_range=Add three columns per sensor in minimum, mean, maximum order; repeat for each sensor. The chart shows the min-mean-max ranges side by side.
 logdef.range_columns='{name}': choose exactly three columns in minimum, mean, maximum order.
+logdef.grouped_range_columns='{name}': add at least two complete triples in minimum, mean, maximum order.
 logdef.auto_time='{name}': do not select the time column; it is added automatically.
-chart.range_order=Range chart: minimum must be at most the mean, and the mean at most the maximum.
-chart.range_order_details=Range chart: minimum ≤ mean ≤ maximum required. Check column order and source data. At {time}: minimum '{minimum}' = {min_value}, mean '{mean}' = {mean_value}, maximum '{maximum}' = {max_value}.
-chart.range_period=Range chart: choose three columns with the same time basis.
+chart.range_order=Min-mean-max chart: minimum ≤ mean ≤ maximum is required.
+chart.range_order_details=Min-mean-max chart: check column order and source data. At {time}: minimum '{minimum}' = {min_value}, mean '{mean}' = {mean_value}, maximum '{maximum}' = {max_value}.
+chart.range_period=Min-mean-max chart: choose columns with the same time basis.
+chart.grouped_range_columns=Min-mean-max per sensor requires at least two complete triples of columns.
 chart.range_columns=Range chart requires three columns: minimum, mean, maximum.
 chart.bar_secondary=This bar chart does not support a secondary axis.
 logdef.hint_scatter=Select exactly two columns: first = Y, second = X
@@ -172,6 +179,19 @@ formula.columns_title=Columns (double-click = insert)
 formula.functions_title=Functions (double-click = insert)
 formula.test=Test formula
 formula.edit_functions=Edit custom functions...
+formula.select_functions=Choose visible functions...
+formula.select_functions_hint=Select the functions to show in the list.
+formula.edit_catalog=Edit function catalog...
+formula.catalog_editor=Function catalog
+formula.catalog_editor_title=Function catalog - {name}
+formula.catalog_editor_hint=Edit groups, colors, and functions as JSON. Groups for custom functions are defined in Functies.funcdef.
+formula.find=Find:
+formula.find_previous=Previous
+formula.find_next=Next
+formula.find_none=No matches
+formula.find_count={current}/{total}
+formula.catalog_invalid=Invalid function catalog {path}: {error}
+formula.catalog_other=Other
 formula.save_apply=Save and apply
 formula.own_functions=Custom functions
 formula.own_functions_title=Custom functions - {name}
@@ -183,8 +203,8 @@ formula.unique_names=Every formula must have a unique name.
 
 # Formula errors
 ferr.invalid_formula=Invalid formula in {name}:{line}
-ferr.invalid_definition=Invalid definition in {source}:{line}
-ferr.builtin_name='{name}' is a built-in name ({source}:{line})
+ferr.invalid_definition=Invalid definition on line {line} in {source}
+ferr.builtin_name='{name}' is a built-in name (line {line} in {source})
 ferr.own_constant={name} - custom constant
 ferr.own_function={name}({params}) - custom function
 ferr.column_missing=Column '{name}' does not exist.
@@ -208,10 +228,6 @@ ferr.name_missing=Name is missing.
 ferr.name_exists=A column with this name already exists.
 
 # Function descriptions
-func.DAGMIN=DAGMIN([column]) - minimum per day
-func.DAGMAX=DAGMAX([column]) - maximum per day
-func.DAGSOM=DAGSOM([column]) - total per day
-func.DAGGEM=DAGGEM([column]) - mean per day
 func.SUM=SUM(a; b; ...) - sum per row
 func.SUBTRACT=SUBTRACT(a; b; ...) - subtract values per row
 func.PRODUCT=PRODUCT(a; b; ...) - multiply values per row
@@ -239,7 +255,7 @@ func.RADIANS=RADIANS(degrees)
 func.DEGREES=DEGREES(radians)
 func.DIFF=DIFF(x) - difference with previous row
 func.ROLLAVG=ROLLAVG(x; n) - rolling mean over n rows
-func.STAP=STAP() - time step of the data in hours
+func.STEP=STEP() - time step of the data in hours (STAP)
 func.DERIVATIVE=DERIVATIVE(x; unit) - derivative per time unit: SECOND, MINUTE, HOUR or DAY
 func.INTEGRAL=INTEGRAL(x; unit) - running integral over time: SECOND, MINUTE, HOUR or DAY
 func.FIRST_DERIVATIVE=FIRST_DERIVATIVE(x; unit) - first derivative per time unit
@@ -247,6 +263,6 @@ func.SECOND_DERIVATIVE=SECOND_DERIVATIVE(x; unit) - second derivative per time u
 func.CUMULATIVE_INTEGRAL=CUMULATIVE_INTEGRAL(x; unit) - cumulative trapezoidal integral over time
 func.INTEGRAL_DEVIATION=INTEGRAL_DEVIATION(x; unit) - cumulative integral of x minus its mean
 func.UUR=UUR() - time of the row as decimal hour (0-24)
-func.ZONOP=ZONOP(latitude; longitude; utc offset) - sunrise in decimal hours
-func.ZONONDER=ZONONDER(latitude; longitude; utc offset) - sunset in decimal hours
-funcdef.header=# Custom functions and constants (loaded for all loggers)\n# Constant:  NAME = value or formula\n# Function:  NAME(param1; param2) = formula   (parameters as [param1] or param1)\n
+func.SUNUP=SUNUP(latitude; longitude; utc offset) - sunrise in decimal hours (ZONOP)
+func.SUNDOWN=SUNDOWN(latitude; longitude; utc offset) - sunset in decimal hours (ZONONDER)
+funcdef.header=# Custom functions and constants (loaded for all loggers)\n# Constant:  NAME @ Group = value or formula\n# Function:  NAME(param1; param2) @ Group = formula   (parameters as [param1] or param1)\n

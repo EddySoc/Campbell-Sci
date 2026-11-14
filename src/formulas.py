@@ -14,7 +14,7 @@ from i18n import t
 
 FORMULA_HEADER = (
     "# name;formula\n"
-    "# Excel-achtige formules. Kolommen: [Kolomnaam]. Dagfuncties: DAGMIN, DAGMAX, DAGSOM, DAGGEM.\n"
+    "# Excel-achtige formules. Kolommen: [Kolomnaam].\n"
 )
 
 
@@ -105,17 +105,14 @@ ALIASES = {
     "INTEGRAAL_VAN_AFWIJKING": "INTEGRAL_DEVIATION",
     "SOM": "SUM", "GEMIDDELDE": "AVERAGE", "ALS": "IF", "EN": "AND", "OF": "OR", "NIET": "NOT",
     "WORTEL": "SQRT", "AFRONDEN": "ROUND", "MACHT": "POWER", "REST": "MOD", "HELE": "INT",
-    "DAYMIN": "DAGMIN", "DAYMAX": "DAGMAX", "DAYSUM": "DAGSOM", "DAYAVG": "DAGGEM", "DAYAVERAGE": "DAGGEM",
     "VERSCHIL": "DIFF", "GLIJDEND": "ROLLAVG", "MULTIPLY": "PRODUCT",
     "AFTREKKEN": "SUBTRACT", "VERMENIGVULDIGEN": "PRODUCT", "DELEN": "DIVIDE",
+    "STAP": "STEP", "ZONOP": "SUNUP", "ZONONDER": "SUNDOWN",
+    "DAUWPUNT": "DEWPOINT", "SUNINTERVAL": "ZONINTERVAL", "DAYLENGTH": "DAGLENGTE",
 }
 
 # naam -> beschrijving (voor de editor)
 FUNCTION_HELP = {
-    "DAGMIN": "DAGMIN([kolom]) - minimum per dag",
-    "DAGMAX": "DAGMAX([kolom]) - maximum per dag",
-    "DAGSOM": "DAGSOM([kolom]) - totaal per dag",
-    "DAGGEM": "DAGGEM([kolom]) - gemiddelde per dag",
     "SUM": "SUM(a; b; ...) - som per rij (SOM)",
     "SUBTRACT": "SUBTRACT(a; b; ...) - trek waarden per rij van elkaar af (AFTREKKEN)",
     "PRODUCT": "PRODUCT(a; b; ...) - vermenigvuldig waarden per rij (MULTIPLY)",
@@ -143,7 +140,7 @@ FUNCTION_HELP = {
     "DEGREES": "DEGREES(radialen)",
     "DIFF": "DIFF(x) - verschil met vorige rij (VERSCHIL)",
     "ROLLAVG": "ROLLAVG(x; n) - voortschrijdend gemiddelde over n rijen (GLIJDEND)",
-    "STAP": "STAP() - tijdstap van de data in uren",
+    "STEP": "STEP() - tijdstap van de data in uren (STAP)",
     "DERIVATIVE": "DERIVATIVE(x; eenheid) - afgeleide per tijdseenheid: SECOND, MINUTE, HOUR of DAY (AFGELEIDE)",
     "INTEGRAL": "INTEGRAL(x; eenheid) - lopende integraal over de tijd: SECOND, MINUTE, HOUR of DAY (INTEGRAAL)",
     "FIRST_DERIVATIVE": "FIRST_DERIVATIVE(x; eenheid) - eerste afgeleide per tijdseenheid",
@@ -151,21 +148,21 @@ FUNCTION_HELP = {
     "CUMULATIVE_INTEGRAL": "CUMULATIVE_INTEGRAL(x; eenheid) - cumulatieve trapeziumintegraal over de tijd",
     "INTEGRAL_DEVIATION": "INTEGRAL_DEVIATION(x; eenheid) - cumulatieve integraal van x minus het gemiddelde van x",
     "UUR": "UUR() - tijdstip van de rij als decimaal uur (0-24)",
-    "ZONOP": "ZONOP(breedte; lengte; utc-verschil) - zonsopkomst in decimaal uur",
-    "ZONONDER": "ZONONDER(breedte; lengte; utc-verschil) - zonsondergang in decimaal uur",
+    "SUNUP": "SUNUP(breedte; lengte; utc-verschil) - zonsopkomst in decimaal uur (ZONOP)",
+    "SUNDOWN": "SUNDOWN(breedte; lengte; utc-verschil) - zonsondergang in decimaal uur (ZONONDER)",
 }
 
 def function_help() -> dict[str, str]:
     return {name: t(f"func.{name}", default=text) for name, text in FUNCTION_HELP.items()}
 
 
-_MACRO_HEAD = re.compile(r"^([A-Za-z_]\w*)\s*(?:\(([^)]*)\))?$")
+_MACRO_HEAD = re.compile(r"^([A-Za-z_]\w*)\s*(?:\(([^)]*)\))?\s*(?:@\s*([^@=]+))?$")
 MAX_CALL_DEPTH = 20
 
 FUNCDEF_HEADER = (
     "# Eigen functies en constanten (worden voor alle loggers geladen)\n"
-    "# Constante:  NAAM = waarde of formule\n"
-    "# Functie:    NAAM(param1; param2) = formule   (parameters als [param1] of param1)\n"
+    "# Constante:  NAAM @ Groep = waarde of formule\n"
+    "# Functie:    NAAM(param1; param2) @ Groep = formule   (parameters als [param1] of param1)\n"
 )
 
 
@@ -189,8 +186,24 @@ def parse_funcdefs(text: str, source: str = "funcdef") -> dict[str, dict[str, An
         params = None if match.group(2) is None else [
             p.strip().upper() for p in re.split(r"[;,]", match.group(2)) if p.strip()
         ]
-        macros[name] = {"name": match.group(1), "params": params, "body": body.strip()}
+        group = match.group(3).strip() if match.group(3) is not None else None
+        if match.group(3) is not None and not group:
+            raise ValueError(t("ferr.invalid_definition", source=source, line=number))
+        macros[name] = {"name": match.group(1), "params": params, "body": body.strip(), "group": group}
     return macros
+
+
+def add_funcdef_groups(text: str, groups: dict[str, str], default_group: str) -> str:
+    lines = []
+    for raw in text.splitlines():
+        if raw.strip() and not raw.lstrip().startswith("#"):
+            head, separator, body = raw.partition("=")
+            match = _MACRO_HEAD.fullmatch(head.strip())
+            if separator and match and match.group(3) is None:
+                group = groups.get(match.group(1).upper(), default_group)
+                raw = f"{head.rstrip()} @ {group} ={body}"
+        lines.append(raw)
+    return "\n".join(lines) + "\n"
 
 
 def load_funcdefs(directory: str | Path) -> dict[str, dict[str, Any]]:
@@ -244,7 +257,6 @@ class _Evaluator:
         if "TMSTAMP" in self.lookup:
             self.lookup.setdefault("TIMESTAMP", self.lookup["TMSTAMP"])
         self._times: pd.Series | None = None
-        self._day: pd.Series | None = None
         self.functions: dict[str, Callable[..., Any]] = self._build_functions()
 
     def column(self, name: str) -> Any:
@@ -260,11 +272,6 @@ class _Evaluator:
         if self._times is None:
             self._times = pd.to_datetime(self.measure.iloc[:, 0], format="mixed", errors="coerce")
         return self._times
-
-    def day(self) -> pd.Series:
-        if self._day is None:
-            self._day = self.times().dt.normalize()
-        return self._day
 
     def _step(self) -> np.float64:
         seconds = self.times().diff().dt.total_seconds().median()
@@ -321,13 +328,6 @@ class _Evaluator:
             return (value.fillna(0) != 0).to_numpy()
         return bool(value)
 
-    def _daily(self, how: str) -> Callable[[Any], pd.Series]:
-        def calculate(value: Any) -> pd.Series:
-            grouped = self.series(value).astype(float).groupby(self.day())
-            result = grouped.transform(how)
-            return result.where(grouped.transform("count") > 0)
-        return calculate
-
     def _across(self, how: str) -> Callable[..., pd.Series]:
         def calculate(*values: Any) -> pd.Series:
             if not values:
@@ -373,8 +373,6 @@ class _Evaluator:
 
     def _build_functions(self) -> dict[str, Callable[..., Any]]:
         functions: dict[str, Callable[..., Any]] = {
-            "DAGMIN": self._daily("min"), "DAGMAX": self._daily("max"),
-            "DAGSOM": self._daily("sum"), "DAGGEM": self._daily("mean"),
             "SUM": self._across("sum"), "MIN": self._across("min"),
             "MAX": self._across("max"), "AVERAGE": self._across("mean"),
             "SUBTRACT": self._across("subtract"), "PRODUCT": self._across("multiply"),
@@ -387,12 +385,12 @@ class _Evaluator:
             "INT": np.floor, "ROUND": self._round, "POWER": operator.pow, "MOD": operator.mod,
             "DIFF": lambda value: self.series(value).astype(float).diff(),
             "ROLLAVG": self._rolling,
-            "STAP": self._step, "UUR": self._hour,
+            "STEP": self._step, "UUR": self._hour,
             "DERIVATIVE": self._derivative, "INTEGRAL": self._integral,
             "FIRST_DERIVATIVE": self._derivative, "SECOND_DERIVATIVE": self._second_derivative,
             "CUMULATIVE_INTEGRAL": self._integral, "INTEGRAL_DEVIATION": self._integral_deviation,
-            "ZONOP": lambda *args: self._sun(True, *args),
-            "ZONONDER": lambda *args: self._sun(False, *args),
+            "SUNUP": lambda *args: self._sun(True, *args),
+            "SUNDOWN": lambda *args: self._sun(False, *args),
         }
         return functions
 
@@ -465,17 +463,17 @@ class _Evaluator:
         if isinstance(node, ast.Call):
             if not isinstance(node.func, ast.Name) or node.keywords:
                 raise FormulaError(t("ferr.invalid_call"))
-            name = node.func.id.upper()
+            original_name = node.func.id
+            name = ALIASES.get(original_name.upper(), original_name.upper())
             arguments = [self.visit(argument) for argument in node.args]
             macro = self.macros.get(name)
             if macro is not None:
                 if macro["params"] is None:
                     raise FormulaError(t("ferr.constant_not_function", name=macro["name"]))
                 return self._call_macro(macro, arguments)
-            name = ALIASES.get(name, name)
             function = self.functions.get(name)
             if function is None:
-                raise FormulaError(t("ferr.unknown_function", name=node.func.id))
+                raise FormulaError(t("ferr.unknown_function", name=original_name))
             try:
                 return function(*arguments)
             except TypeError as exc:

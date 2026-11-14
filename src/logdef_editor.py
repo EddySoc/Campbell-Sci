@@ -9,8 +9,8 @@ from formulas import backup_original
 from i18n import t
 from logdef_format import parse_chart_fields
 
-CHART_TYPES = ["line", "bar", "bar_grouped", "bar_range", "scatter", "windroos"]
-TIME_CHART_TYPES = {"line", "bar", "bar_grouped", "bar_range"}
+CHART_TYPES = ["line", "bar", "bar_grouped", "bar_range", "bar_grouped_range", "scatter", "windroos"]
+TIME_CHART_TYPES = {"line", "bar", "bar_grouped", "bar_range", "bar_grouped_range"}
 COLORS = ["", "red", "blue", "cyan", "yellow", "green", "orange", "purple", "gray", "black"]
 HEADER = (
     "# name;type;columns;minimum;maximum;number format;tab color\n"
@@ -158,6 +158,7 @@ class LogdefEditor(tk.Toplevel):
             "bar": "logdef.hint_time",
             "bar_grouped": "logdef.hint_grouped",
             "bar_range": "logdef.hint_range",
+            "bar_grouped_range": "logdef.hint_grouped_range",
             "scatter": "logdef.hint_scatter",
             "windroos": "logdef.hint_windrose",
         }[kind]))
@@ -327,7 +328,11 @@ class LogdefEditor(tk.Toplevel):
                 problems.append(t("logdef.scatter_columns", name=chart["name"]))
             if chart["type"] == "bar_range" and len(chart["columns"]) != 3:
                 problems.append(t("logdef.range_columns", name=chart["name"]))
-            if chart["type"] in {"bar_range", "bar_grouped"} and any(
+            if chart["type"] == "bar_grouped_range" and (
+                len(chart["columns"]) < 6 or len(chart["columns"]) % 3
+            ):
+                problems.append(t("logdef.grouped_range_columns", name=chart["name"]))
+            if chart["type"] in {"bar_range", "bar_grouped", "bar_grouped_range"} and any(
                 column.split("@")[0].strip().upper() == self.time_column.upper()
                 for column in chart["columns"]
             ):

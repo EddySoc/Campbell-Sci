@@ -1,21 +1,20 @@
 from __future__ import annotations
 
-import ctypes
 from pathlib import Path
 import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-import pandas as pd
-
+from app_config import prepare_external_configs
 from i18n import init_language, t
 from settings import get_last_dir, set_last_dir
-from viewer import CampbellViewer, logger_from_filename, prepare_external_configs, read_dat_file
 
 
 def set_windows_app_user_model_id() -> None:
     if sys.platform != "win32":
         return
+
+    import ctypes
 
     set_app_id = ctypes.WinDLL("shell32", use_last_error=True).SetCurrentProcessExplicitAppUserModelID
     set_app_id.argtypes = [ctypes.c_wchar_p]
@@ -55,15 +54,14 @@ def main() -> None:
         return
 
     try:
+        from viewer import CampbellViewer, logger_from_filename, read_dat_file
+
         source = Path(file_path)
         set_last_dir(source.parent)
         logger = logger_from_filename(source)
         data = read_dat_file(source)
         if logger in {"BM", "BRAS"}:
             data = data.replace(["6999", "-6999", "7999", "-7999", "NAN", "INF"], float("nan"))
-            if "IR_R_R_Avg" in data.columns:
-                infrared = pd.to_numeric(data["IR_R_R_Avg"], errors="coerce")
-                data["Leaf T."] = (infrared / 0.0000000567) ** 0.25 - 273.16
         root = tk.Tk()
         CampbellViewer(root, data, source, logger)
         root.mainloop()

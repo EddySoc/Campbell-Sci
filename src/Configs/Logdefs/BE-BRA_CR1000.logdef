@@ -1,0 +1,15 @@
+# name;type;columns;minimum;maximum;number format;tab color
+# type=windroos uses one direction-column header in columns; omit the line for loggers without a windrose.
+# tab color: hex code or a readable color name
+# optional eighth field: linear (scatter trendline)
+Water Depht;line;TIMESTAMP,WATER_TABLE_DEPTH_1_1_1_Avg,WATER_TABLE_DEPTH_2_1_1_Avg,WATER_TABLE_DEPTH_3_1_1_Avg,WATER_TABLE_DEPTH_4_1_1_Avg;;;0.0;
+shf_mv;line;TIMESTAMP,shf_mV_1_1_1_Avg,shf_mV_2_1_1_Avg,shf_mV_3_1_1_Avg,shf_mV_4_1_1_Avg;;;0.0;
+V_RF;line;TIMESTAMP,V_Rf_1_1_1_Avg,V_Rf_2_1_1_Avg,V_Rf_3_1_1_Avg,V_Rf_4_1_1_Avg;;;0.0;
+TS_1;line;TIMESTAMP,TS_1_1_1_Avg,TS_1_2_1_Avg,TS_1_3_1_Avg,TS_1_4_1_Avg,TS_1_5_1_Avg,TS_1_6_1_Avg;;;0.0;
+TS_2;line;TIMESTAMP,TS_2_1_1_Avg,TS_2_2_1_Avg,TS_2_3_1_Avg,TS_2_4_1_Avg,TS_2_5_1_Avg,TS_2_6_1_Avg;;;0.0;
+TS_3;line;TIMESTAMP,TS_3_1_1_Avg,TS_3_2_1_Avg,TS_3_3_1_Avg,TS_3_4_1_Avg,TS_3_5_1_Avg,TS_3_6_1_Avg;;;0.0;
+TS_4;line;TIMESTAMP,TS_4_1_1_Avg,TS_4_2_1_Avg,TS_4_3_1_Avg,TS_4_4_1_Avg,TS_4_5_1_Avg,TS_4_6_1_Avg;;;0.0;
+SWC_1;line;TIMESTAMP,SWC_1_1_1_Avg,SWC_1_2_1_Avg,SWC_1_3_1_Avg,SWC_1_4_1_Avg,SWC_1_5_1_Avg;;;0.0;
+SWC_2;line;TIMESTAMP,SWC_2_1_1_Avg,SWC_2_2_1_Avg,SWC_2_3_1_Avg,SWC_2_4_1_Avg,SWC_2_5_1_Avg;;;0.0;
+SWC_3;line;TIMESTAMP,SWC_3_1_1_Avg,SWC_3_2_1_Avg,SWC_3_3_1_Avg,SWC_3_4_1_Avg,SWC_3_5_1_Avg;;;0.0;
+SWC_4;line;TIMESTAMP,SWC_4_1_1_Avg,SWC_4_2_1_Avg,SWC_4_3_1_Avg,SWC_4_4_1_Avg,SWC_4_5_1_Avg;;;0.0;

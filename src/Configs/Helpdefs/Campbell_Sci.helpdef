@@ -15,6 +15,7 @@ Pivot-kolommen zijn beschikbaar in de LogDef Editor. Meetreeksen en Pivot-reekse
 ## Data aanpassen en opslaan
 Dubbelklik op een cel in de Data-tab om de waarde te wijzigen. Gebruik Opslaan om de gewijzigde data als een nieuw .dat-bestand op te slaan; het oorspronkelijke bestand wordt niet overschreven.
 Er kunnen ook meerdere waarden worden aangeduid om te resetten.
+Vul bij Kolom zoeken de volledige kolomtitel in en druk op Enter of Ga naar. De tabel schuift naar de kolom; bestaat die niet, dan verschijnt een melding. Dit werkt in Data, Calc en de geselecteerde Pivot-periode en is niet hoofdlettergevoelig.
 
 ## Grafieken en configuraties aanpassen
 Open LogDef Editor om grafieken samen te stellen en een .logdef-bestand te laden, te editeren en op te slaan. Loggerconfiguraties staan in Configs/Logdefs. Als er een locatiecode in de bestandsnaam staat, wordt eerst een configuratie voor die logger en locatie gezocht; anders wordt de algemene loggerconfiguratie gebruikt.
@@ -35,7 +36,7 @@ Verwijs naar een bestaande kolom met de kolomnaam tussen vierkante haken, bijvoo
 Gebruik puntnotatie voor decimalen. De editor voegt een functie als `FUNCTIE()` in met de cursor tussen de haakjes. Een gekozen kolom wordt op de cursorpositie ingevoegd, gevolgd door een komma; een overbodige komma aan het einde wordt bij bevestigen verwijderd. Functieargumenten mogen met komma's of puntkomma's worden gescheiden. Voorbeelden:
 - `[Temp_02_m_Avg] - [Temp_02_m_Min]`
 - `IF([Regen] > 0; 1; 0)`
-- `DAGGEM([Temp_02_m_Avg])`
+- `LEAFT([IR_R_R_Avg])`
 
 De gebruikelijke rekenoperatoren zijn `+`, `-`, `*`, `/`, `^` (macht) en `%` (rest). Vergelijkingen zoals `>`, `>=`, `<`, `<=`, `=` en `<>` kunnen in voorwaarden worden gebruikt. `AND`, `OR` en `NOT` combineren voorwaarden; `TRUE` en `FALSE` zijn beschikbaar als logische waarden. `PI` is de constante pi. Formules worden per meetrij berekend.
 
@@ -44,24 +45,33 @@ Formules staan in `Configs/Formuladefs` in bestanden met de indeling `naam;formu
 ### Ingebouwde functies
 In de data is een rij één meetmoment en een kolom één meetgrootheid. Argumenten in de voorbeelden zijn invoerwaarden; scheid meerdere argumenten met komma's of puntkomma's.
 - Kolommen combineren op hetzelfde meetmoment: `SUM(a; b; ...)`, `SUBTRACT(a; b; ...)`, `PRODUCT(a; b; ...)` (ook `MULTIPLY`), `DIVIDE(a; b; ...)`, `MIN(a; b; ...)`, `MAX(a; b; ...)` en `AVERAGE(a; b; ...)` werken per rij op de opgegeven kolommen. Bijvoorbeeld `SUBTRACT([Meting_A]; [Meting_B])` trekt de tweede waarde af van de eerste; `DIVIDE([Meting_A]; [Meting_B])` deelt de eerste door de tweede. Met meerdere argumenten worden aftrekken en delen achtereenvolgens van links naar rechts uitgevoerd. `SUM` telt dus niet alle rijen van één kolom over de tijd op. Let erop dat combineren alleen zinvol is als de meetgrootheden en eenheden bij elkaar passen.
-- Eén kolom samenvatten door de tijd per dag: `DAGMIN(x)`, `DAGMAX(x)`, `DAGSOM(x)` en `DAGGEM(x)` berekenen respectievelijk minimum, maximum, som en gemiddelde van die kolom voor iedere dag.
 - Voorwaarden: `IF(voorwaarde; waarde_als_waar; waarde_als_onwaar)`, `AND(a; b; ...)`, `OR(a; b; ...)` en `NOT(a)`.
 - Rekenen: `ABS(x)`, `SQRT(x)`, `ROUND(x; decimalen)`, `INT(x)`, `POWER(x; y)`, `MOD(x; y)`, `LN(x)`, `LOG10(x)` en `EXP(x)`.
 - Trigonometrie: `SIN(x)`, `COS(x)` en `TAN(x)` verwachten radialen. Gebruik `RADIANS(graden)` of `DEGREES(radialen)` om om te rekenen.
 - Tijdreeksen: `DIFF(x)` geeft voor één kolom het verschil met de vorige meetrij; `ROLLAVG(x; n)` geeft voor één kolom het voortschrijdend gemiddelde over n opeenvolgende meetrijen.
 - Differentiaal en integraal: `DERIVATIVE(x; eenheid)` (AFGELEIDE) geeft de verandering van x per tijdseenheid; `INTEGRAL(x; eenheid)` (INTEGRAAL) geeft de lopende integraal over de tijd (trapeziumregel, ontbrekende waarden tellen als 0). De eenheid is `SEC`, `MIN`, `UUR` of `DAG` (ook `S`, `H`, `D`) en wordt zonder aanhalingstekens geschreven; zonder eenheid wordt uur gebruikt. Bijvoorbeeld `INTEGRAL([Straling]; UUR)`.
-- Tijd en zon: `STAP()` geeft de tijdstap in uren, `UUR()` de tijd van de meetrij als decimaal uur, en `ZONOP(breedte; lengte; utc)` en `ZONONDER(breedte; lengte; utc)` de zonsopkomst en zonsondergang als decimaal uur. `utc` is het verschil tussen logger-tijd en UTC in uren.
+- Tijd en zon: `STEP()` geeft de tijdstap in uren, `UUR()` de tijd van de meetrij als decimaal uur, en `SUNUP(breedte; lengte; utc)` en `SUNDOWN(breedte; lengte; utc)` de zonsopkomst en zonsondergang als decimaal uur. `utc` is het verschil tussen logger-tijd en UTC in uren. De Nederlandse namen `STAP`, `ZONOP` en `ZONONDER` blijven als aliassen werken.
 
-Nederlandse aliassen zijn beschikbaar: `SOM` (SUM), `AFTREKKEN` (SUBTRACT), `VERMENIGVULDIGEN` (PRODUCT), `DELEN` (DIVIDE), `GEMIDDELDE` (AVERAGE), `ALS` (IF), `EN` (AND), `OF` (OR), `NIET` (NOT), `WORTEL` (SQRT), `AFRONDEN` (ROUND), `MACHT` (POWER), `REST` (MOD), `HELE` (INT), `VERSCHIL` (DIFF) en `GLIJDEND` (ROLLAVG). De dagfuncties hebben ook de Engelse aliassen `DAYMIN`, `DAYMAX`, `DAYSUM`, `DAYAVG` en `DAYAVERAGE`.
+Nederlandse aliassen zijn beschikbaar: `SOM` (SUM), `AFTREKKEN` (SUBTRACT), `VERMENIGVULDIGEN` (PRODUCT), `DELEN` (DIVIDE), `GEMIDDELDE` (AVERAGE), `ALS` (IF), `EN` (AND), `OF` (OR), `NIET` (NOT), `WORTEL` (SQRT), `AFRONDEN` (ROUND), `MACHT` (POWER), `REST` (MOD), `HELE` (INT), `VERSCHIL` (DIFF) en `GLIJDEND` (ROLLAVG).
+
+Dagminimum, -maximum, -som en -gemiddelde maak je met een draaitabel, niet meer met DAGMIN, DAGMAX, DAGSOM of DAGGEM. Zet oudere formules en eigen functiedefinities die deze functies gebruiken handmatig om; ook hun Engelse aliassen zijn verwijderd. Voor zonuren berekent `ZONINTERVAL([Solar_Rad_Avg])` de zonuren per meetinterval; tel deze kolom per dag op met een draaitabel en gebruik eventueel `ZONPERCENTAGE([Uren_Zon])` in een formule op de dag-draaitabel. Bij een upgrade worden bestaande externe configuratiebestanden niet automatisch vervangen.
 
 ### Eigen functies en constanten
-De knop Eigen functies bewerken... opent `Configs/Functiedefs/Functies.funcdef`. Eigen definities worden voor alle loggers geladen. Een constante heeft de vorm `NAAM = waarde_of_formule`; een functie heeft de vorm `NAAM(parameter1; parameter2) = formule`. Gebruik parameters in de formule als `parameter1` of `[parameter1]`. Voorbeelden:
+De knop Eigen functies bewerken... opent `Configs/Functiedefs/Functies.funcdef`. Eigen definities worden voor alle loggers geladen. Zet de groep na `@` bij iedere definitie. Gebruik parameters in de formule als `parameter1` of `[parameter1]`. Voorbeelden:
 
-`FACTOR = 1.8`
+`FACTOR @ Rekenen = 1.8`
 
-`NAAR_CELSIUS(f) = (f - 32) / FACTOR`
+`NAAR_CELSIUS(f) @ Meteo = (f - 32) / FACTOR`
 
 Dubbelklik op een functie in de functielijst om die met haakjes in te voegen; de cursor staat tussen de haakjes. Eigen constanten worden zonder haakjes ingevoegd. Eigen functies kunnen ingebouwde functies en constanten gebruiken. Namen van ingebouwde functies en constanten kunnen niet opnieuw worden gedefinieerd.
+
+Met Zichtbare functies kiezen... bepaal je welke functies in de lijst staan; de keuze verandert niet welke functies in formules werken. Bij opslaan van eigen functies wordt het functieoverzicht automatisch bijgewerkt: nieuwe functies worden toegevoegd, verwijderde verdwijnen en wijzigingen van groep worden gevolgd. Bestaande definities zonder groep blijven werken; bij opslaan krijgen ze hun bestaande groep of anders Overig. Een nieuwe groepsnaam krijgt aanvankelijk een grijze kleur.
+
+De kleuren, volgorde en zichtbaarheid staan in `Configs/Functiedefs/Functieoverzicht.def` (JSON). Elke groep heeft `name`, een `color` als `#RRGGBB` en een lijst `functions` met per functie `name` en `visible` (true of false). Verander de groep van een eigen functie in de .funcdef, niet in het functieoverzicht. Open de editor opnieuw na handmatige wijzigingen buiten de app.
+
+`LEAFT(straling)` staat in de groep Meteo en berekent de bladtemperatuur. De kolom `Leaf T.` wordt niet meer automatisch toegevoegd: maak desgewenst zelf een berekende kolom `Leaf T.` met `LEAFT([IR_R_R_Avg])`, bijvoorbeeld voor bestaande grafieken.
+
+`DauwPunt(temperatuur; relatieve_vochtigheid)` berekent het dauwpunt met de Magnus-formule. Geef de temperatuur in graden Celsius en de relatieve vochtigheid in procent, bijvoorbeeld `DauwPunt([Temperatuur]; [RV])`.
 
 ## Taal
 Kies de taal met de keuzelijst rechts in de werkbalk; de keuze wordt bewaard. Taalbestanden staan in Configs/Langdefs (`<code>.langdef`). Voor een extra taal kopieer je `nl.langdef` naar een nieuw bestand zoals `fr.langdef`, stel je `language.name` in en vertaal je de teksten. Een vertaalde helptekst kan `Campbell_Sci.<code>.helpdef` heten in Configs/Helpdefs. Namen van functies en grafieken in je eigen configuratiebestanden worden niet vertaald.

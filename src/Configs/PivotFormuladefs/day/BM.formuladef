@@ -1,0 +1,4 @@
+# name;formula
+# Excel-achtige formules. Kolommen: [Kolomnaam].
+Gemiddelde;AVERAGE([Temp Day Min],[Temp Day Max])
+Zonpercentage;ZONPERCENTAGE([Uren_Zon])

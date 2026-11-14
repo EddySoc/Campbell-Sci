@@ -9,13 +9,92 @@ from typing import Callable
 import pandas as pd
 
 from formulas import (
-    FormulaError, apply_formulas, backup_original,
+    FormulaError, add_funcdef_groups, apply_formulas, backup_original,
     evaluate_formula, formula_path, function_help, funcdef_header, load_formulas, load_funcdefs, macro_help,
     parse_funcdefs, save_formulas,
+)
+from function_catalog import (
+    CATALOG_NAME, FunctionEntry, FunctionGroup, include_unlisted, load_catalog, parse_catalog, save_catalog,
+    serialize_catalog, sync_catalog,
 )
 from i18n import t
 
 FUNCDEF_NAME = "Functies.funcdef"
+
+
+def _add_text_search_bar(
+    parent: tk.Misc, text: tk.Text,
+) -> tuple[ttk.Entry, ttk.Button, ttk.Button]:
+    bar = ttk.Frame(parent, padding=(8, 4))
+    bar.pack(fill="x")
+    ttk.Label(bar, text=t("formula.find")).pack(side="left")
+    query = tk.StringVar(master=parent)
+    entry = ttk.Entry(bar, textvariable=query, width=28)
+    entry.pack(side="left", fill="x", expand=True, padx=6)
+    previous_button = ttk.Button(bar, text=t("formula.find_previous"))
+    previous_button.pack(side="left", padx=(0, 4))
+    next_button = ttk.Button(bar, text=t("formula.find_next"))
+    next_button.pack(side="left")
+    status = tk.StringVar(master=parent)
+    ttk.Label(bar, textvariable=status, width=12, anchor="e").pack(side="left", padx=(6, 0))
+
+    text.tag_configure("find_match", background="#FFF2A8", foreground="#000000")
+    text.tag_configure("find_current", background="#FFB347", foreground="#000000")
+    matches: list[tuple[str, str]] = []
+    current = -1
+
+    def refresh_matches(*_args: object) -> None:
+        nonlocal matches, current
+        text.edit_modified(False)
+        text.tag_remove("find_match", "1.0", "end")
+        text.tag_remove("find_current", "1.0", "end")
+        matches = []
+        current = -1
+        value = query.get()
+        if not value:
+            status.set("")
+            return
+        position = "1.0"
+        while True:
+            found = text.search(value, position, stopindex="end-1c", nocase=True)
+            if not found:
+                break
+            end = text.index(f"{found}+{len(value)}c")
+            matches.append((found, end))
+            text.tag_add("find_match", found, end)
+            position = end
+        status.set(t("formula.find_count", current=0, total=len(matches))
+                   if matches else t("formula.find_none"))
+
+    def move_match(step: int) -> str:
+        nonlocal current
+        if not matches:
+            return "break"
+        current = (current + step) % len(matches) if current >= 0 else (0 if step > 0 else len(matches) - 1)
+        start, end = matches[current]
+        text.tag_remove("find_current", "1.0", "end")
+        text.tag_add("find_current", start, end)
+        text.mark_set("insert", start)
+        text.see(start)
+        status.set(t("formula.find_count", current=current + 1, total=len(matches)))
+        return "break"
+
+    previous_button.configure(command=lambda: move_match(-1))
+    next_button.configure(command=lambda: move_match(1))
+    entry.bind("<Return>", lambda _event: move_match(1))
+    entry.bind("<Shift-Return>", lambda _event: move_match(-1))
+    query.trace_add("write", refresh_matches)
+    text.bind("<<Modified>>", lambda _event: refresh_matches(), add="+")
+
+    def focus_find(_event: tk.Event | None = None) -> str:
+        entry.focus_set()
+        entry.selection_range(0, "end")
+        return "break"
+
+    parent.winfo_toplevel().bind("<Control-f>", focus_find, add="+")
+    text.bind("<Control-f>", focus_find, add="+")
+    entry.bind("<Control-f>", focus_find, add="+")
+    return entry, previous_button, next_button
 
 
 class FormulaEditor(tk.Toplevel):
@@ -94,8 +173,14 @@ class FormulaEditor(tk.Toplevel):
         self.functions_box = tk.Listbox(functions_frame, exportselection=False)
         self.functions_box.pack(fill="both", expand=True)
         self.functions_box.bind("<Double-1>", self._insert_function)
-        self.function_names: list[str] = []
+        self.function_names: list[str | None] = []
+        self.catalog: list[FunctionGroup] | None = None
         self._fill_functions()
+        if self.function_dir:
+            ttk.Button(functions_frame, text=t("formula.select_functions"),
+                       command=self._select_functions).pack(anchor="w", pady=(4, 0))
+            ttk.Button(functions_frame, text=t("formula.edit_catalog"),
+                       command=self._edit_catalog).pack(anchor="w", pady=(4, 0))
 
         bottom = ttk.Frame(right)
         bottom.pack(fill="x", pady=(10, 0))
@@ -125,6 +210,8 @@ class FormulaEditor(tk.Toplevel):
         selection = self.functions_box.curselection()
         if selection:
             name = self.function_names[selection[0]]
+            if name is None:
+                return
             macro = self.macros.get(name.upper())
             if macro and macro["params"] is None:
                 self._insert_text(name)
@@ -134,18 +221,126 @@ class FormulaEditor(tk.Toplevel):
     def _load_macros(self) -> None:
         try:
             self.macros = load_funcdefs(self.function_dir) if self.function_dir else {}
-        except ValueError as exc:
+            self.macros_loaded = True
+        except (OSError, ValueError) as exc:
             self.macros = {}
+            self.macros_loaded = False
             messagebox.showerror(t("formula.own_functions"), str(exc), parent=self)
 
     def _fill_functions(self) -> None:
         descriptions = {**function_help(), **macro_help(self.macros)}
-        self.function_names = list(descriptions)
+        by_name = {name.upper(): (name, description) for name, description in descriptions.items()}
+        try:
+            self.catalog = load_catalog(self.function_dir / CATALOG_NAME) if self.function_dir else []
+            if self.function_dir and self.macros_loaded:
+                before = [(group.name, group.color, [(entry.name, entry.visible) for entry in group.functions])
+                          for group in self.catalog]
+                sync_catalog(self.catalog, list(function_help()), self.macros)
+                after = [(group.name, group.color, [(entry.name, entry.visible) for entry in group.functions])
+                         for group in self.catalog]
+                if before != after:
+                    save_catalog(self.function_dir / CATALOG_NAME, self.catalog)
+        except (OSError, ValueError) as exc:
+            messagebox.showerror(t("formula.select_functions"), str(exc), parent=self)
+            self.catalog = None
+        groups = self.catalog if self.catalog is not None else []
+        include_unlisted(groups, list(descriptions))
+        self.function_names = []
         self.functions_box.delete(0, "end")
-        for index, (name, description) in enumerate(descriptions.items()):
-            self.functions_box.insert("end", description)
-            if name.upper() in self.macros:
-                self.functions_box.itemconfig(index, foreground="#0066cc")
+        for group in groups:
+            entries = [entry for entry in group.functions if entry.visible and entry.name.upper() in by_name]
+            if not entries:
+                continue
+            self.functions_box.insert("end", f"--- {group.name} ---")
+            self.function_names.append(None)
+            self.functions_box.itemconfig("end", foreground=group.color)
+            for entry in entries:
+                name, description = by_name[entry.name.upper()]
+                self.functions_box.insert("end", description)
+                self.function_names.append(name)
+                self.functions_box.itemconfig("end", foreground=group.color)
+
+    def _select_functions(self) -> None:
+        if self.catalog is None or self.function_dir is None:
+            return
+        descriptions = {name.upper(): description for name, description in
+                        {**function_help(), **macro_help(self.macros)}.items()}
+        window = tk.Toplevel(self)
+        window.title(t("formula.select_functions"))
+        window.geometry("700x500")
+        frame = ttk.Frame(window, padding=8)
+        frame.pack(fill="both", expand=True)
+        ttk.Label(frame, text=t("formula.select_functions_hint")).pack(anchor="w")
+        box = tk.Listbox(frame, selectmode="multiple", exportselection=False)
+        scrollbar = ttk.Scrollbar(frame, orient="vertical", command=box.yview)
+        box.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        box.pack(fill="both", expand=True)
+        entries: list[FunctionEntry] = []
+        for group in self.catalog:
+            for entry in group.functions:
+                description = descriptions.get(entry.name.upper())
+                if description is None:
+                    continue
+                index = len(entries)
+                entries.append(entry)
+                box.insert("end", f"{group.name}: {description}")
+                box.itemconfig(index, foreground=group.color)
+                if entry.visible:
+                    box.selection_set(index)
+
+        def save() -> None:
+            selected = set(box.curselection())
+            previous = [entry.visible for entry in entries]
+            for index, entry in enumerate(entries):
+                entry.visible = index in selected
+            try:
+                save_catalog(self.function_dir / CATALOG_NAME, self.catalog)
+            except OSError as exc:
+                for entry, visible in zip(entries, previous):
+                    entry.visible = visible
+                messagebox.showerror(t("formula.select_functions"), str(exc), parent=window)
+                return
+            window.destroy()
+            self._fill_functions()
+
+        ttk.Button(window, text=t("button.save"), command=save).pack(side="right", padx=8, pady=(0, 8))
+
+    def _edit_catalog(self) -> None:
+        assert self.function_dir is not None
+        path = self.function_dir / CATALOG_NAME
+        try:
+            content = path.read_text(encoding="utf-8") if path.is_file() else serialize_catalog(self.catalog or [])
+        except OSError as exc:
+            messagebox.showerror(t("formula.catalog_editor"), str(exc), parent=self)
+            return
+
+        window = tk.Toplevel(self)
+        window.title(t("formula.catalog_editor_title", name=path.name))
+        window.geometry("760x520")
+        ttk.Label(window, text=t("formula.catalog_editor_hint"), wraplength=730).pack(
+            anchor="w", padx=8, pady=(8, 4)
+        )
+        text = tk.Text(window, wrap="none", font=("Consolas", 10), undo=True)
+        _add_text_search_bar(window, text)
+        scrollbar = ttk.Scrollbar(window, orient="vertical", command=text.yview)
+        text.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y", padx=(0, 8), pady=8)
+        text.pack(side="left", fill="both", expand=True, padx=8, pady=(0, 8))
+        text.insert("1.0", content)
+        text.edit_modified(False)
+
+        def save() -> None:
+            try:
+                groups = parse_catalog(text.get("1.0", "end-1c"), path)
+                save_catalog(path, groups)
+            except (OSError, ValueError) as exc:
+                messagebox.showerror(t("formula.catalog_editor"), str(exc), parent=window)
+                return
+            self._fill_functions()
+            window.destroy()
+
+        ttk.Button(window, text=t("button.save"), command=save).pack(side="right", padx=8, pady=(0, 8))
 
     def _edit_funcdef(self) -> None:
         assert self.function_dir is not None
@@ -158,8 +353,9 @@ class FormulaEditor(tk.Toplevel):
             takefocus=False, foreground="#666666", background="#f0f0f0",
             relief="flat", borderwidth=0, padx=4,
         )
-        line_numbers.pack(side="left", fill="y", padx=(8, 0), pady=8)
         text = tk.Text(window, wrap="none", font=("Consolas", 10), undo=True)
+        _add_text_search_bar(window, text)
+        line_numbers.pack(side="left", fill="y", padx=(8, 0), pady=8)
         text.pack(side="left", fill="both", expand=True, padx=(0, 0), pady=8)
 
         def scroll_editor(*args: str) -> None:
@@ -192,12 +388,18 @@ class FormulaEditor(tk.Toplevel):
             content = text.get("1.0", "end").rstrip() + "\n"
             try:
                 parse_funcdefs(content, path.name)
-            except ValueError as exc:
+                groups = load_catalog(self.function_dir / CATALOG_NAME)
+                group_by_name = {entry.name.upper(): group.name for group in groups for entry in group.functions}
+                content = add_funcdef_groups(content, group_by_name, t("formula.catalog_other"))
+                for other in self.function_dir.glob("*.funcdef"):
+                    if other != path:
+                        parse_funcdefs(other.read_text(encoding="utf-8"), other.name)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                backup_original(path)
+                path.write_text(content, encoding="utf-8")
+            except (OSError, ValueError) as exc:
                 messagebox.showerror(t("formula.own_functions"), str(exc), parent=window)
                 return
-            path.parent.mkdir(parents=True, exist_ok=True)
-            backup_original(path)
-            path.write_text(content, encoding="utf-8")
             self._load_macros()
             self._fill_functions()
             if self.on_saved:

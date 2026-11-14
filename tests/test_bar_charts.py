@@ -65,6 +65,32 @@ class BarChartTests(unittest.TestCase):
         self.assertEqual([patch.get_height() for patch in first], [-3, 1, 5])
         self.assertEqual([patch._campbell_target for patch in first], [(0, "low"), (0, "mean"), (0, "high")])
 
+    def test_grouped_min_mean_max_bars_cluster_by_sensor(self) -> None:
+        data = pd.DataFrame({
+            "time": ["2025-01-01", "2025-01-02"],
+            "a_min": [1, 2], "a_mean": [3, 4], "a_max": [5, 6],
+            "b_min": [2, 3], "b_mean": [4, 5], "b_max": [6, 7],
+        })
+        headers = {name.upper(): name for name in data.columns}
+        spec = {"type": "bar_grouped_range",
+                "columns": ["time", "a_min", "a_mean", "a_max", "b_min", "b_mean", "b_max"],
+                "minimum": None, "maximum": None}
+        axes = Figure().add_subplot()
+        self.app._draw_special_bars(axes, spec, headers, data)
+        self.assertEqual(len(axes.patches), 8)
+        first_row = [axes.patches[index] for index in (0, 2, 4, 6)]
+        centers = [patch.get_x() + patch.get_width() / 2 for patch in first_row]
+        self.assertEqual(centers[0], centers[1])
+        self.assertEqual(centers[2], centers[3])
+        self.assertGreater(centers[2], centers[1])
+        self.assertEqual([patch._campbell_target for patch in first_row],
+                         [(0, "a_min"), (0, "a_max"), (0, "b_min"), (0, "b_max")])
+        self.assertEqual([patch.get_height() for patch in first_row], [2, 2, 2, 2])
+        self.assertEqual([points._campbell_column for points in axes.collections], ["a_mean", "b_mean"])
+        data.loc[1, "b_mean"] = 8
+        with self.assertRaises(ValueError):
+            self.app._draw_special_bars(Figure().add_subplot(), spec, headers, data)
+
     def test_range_validation(self) -> None:
         self.data.loc[0, "mean"] = 9
         with self.assertRaises(ValueError) as error:
@@ -151,6 +177,38 @@ class BarChartTests(unittest.TestCase):
                 self.assertIsNotNone(grouped)
                 self.assertEqual(grouped[0]["type"], "bar_grouped")
                 self.assertEqual(grouped[0]["columns"], ["low", "mean"])
+            finally:
+                root.update_idletasks()
+                root.destroy()
+
+    def test_grouped_min_mean_max_editor_requires_complete_sensor_groups(self) -> None:
+        import tkinter as tk
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = tk.Tk()
+            try:
+                headers = ["time", "a_min", "a_mean", "a_max", "b_min", "b_mean", "b_max"]
+                editor = LogdefEditor(root, headers, "TEST", Path(directory))
+                editor.type_var.set(editor.type_labels["bar_grouped_range"])
+                editor._update_hint()
+                for column in headers[1:-1]:
+                    editor.selected.insert("end", column)
+                with patch("logdef_editor.messagebox.showwarning") as warning, \
+                     patch("logdef_editor.filedialog.asksaveasfilename") as save_dialog:
+                    editor._save()
+                warning.assert_called_once()
+                save_dialog.assert_not_called()
+                self.assertTrue(editor.winfo_exists())
+
+                editor.selected.insert("end", "b_max")
+                path = Path(directory) / "TEST.logdef"
+                with patch("logdef_editor.filedialog.asksaveasfilename", return_value=str(path)), \
+                     patch("logdef_editor.messagebox.showinfo"):
+                    editor._save()
+                self.assertEqual(path.read_text(encoding="utf-8").splitlines()[-1].split(";")[1:3],
+                                 ["bar_grouped_range",
+                                  "time,a_min,a_mean,a_max,b_min,b_mean,b_max"])
+                self.assertFalse(editor.winfo_exists())
             finally:
                 root.update_idletasks()
                 root.destroy()

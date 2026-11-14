@@ -15,6 +15,7 @@ Pivot columns are available in LogDef Editor. Measurements and Pivot series can 
 ## Editing and saving data
 Double-click a cell in the Data tab, or press Enter, F2 or just start typing, to change the value. Enter confirms and moves the cursor to the cell below. Select several cells with the mouse (click and drag) or with Shift plus click or the arrow keys; the selected cells are highlighted. Delete clears the selection. Use Save to store the modified data as a new .dat file; the original file is not overwritten.
 The Calc tab supports the same selection and Ctrl+C to copy, but is read-only.
+Enter the full column title in Find column and press Enter or Go to. The table scrolls to the column, or displays a message if it does not exist. This works in Data, Calc and the selected Pivot period; matching is case-insensitive.
 
 ## Changing charts and configurations
 Open LogDef Editor to compose charts and to load, edit and save a .logdef file. Logger configurations are stored in Configs/Logdefs. If the file name contains a location code, a configuration for that logger and location is searched first; otherwise the general logger configuration is used.
@@ -38,7 +39,7 @@ Refer to an existing column with the column name between square brackets, for ex
 Use a decimal point for decimals. Double-clicking a function inserts it as `FUNCTION()` with the cursor between the brackets. A chosen column is inserted at the cursor position followed by a comma; a superfluous trailing comma is removed on confirm. Function arguments may be separated by commas or semicolons. Examples:
 - `[Temp_02_m_Avg] - [Temp_02_m_Min]`
 - `IF([Regen] > 0; 1; 0)`
-- `DAGGEM([Temp_02_m_Avg])`
+- `LEAFT([IR_R_R_Avg])`
 
 The usual operators are `+`, `-`, `*`, `/`, `^` (power) and `%` (remainder). Comparisons such as `>`, `>=`, `<`, `<=`, `=` and `<>` can be used in conditions. `AND`, `OR` and `NOT` combine conditions; `TRUE` and `FALSE` are available as logical values. `PI` is the constant pi. Formulas are calculated per measurement row.
 
@@ -47,24 +48,33 @@ Formulas are stored in `Configs/Formuladefs` in files of the form `name;formula`
 ### Built-in functions
 In the data a row is one measurement moment and a column is one quantity. Separate multiple arguments with commas or semicolons.
 - Combining columns at the same moment: `SUM(a; b; ...)`, `SUBTRACT(a; b; ...)`, `PRODUCT(a; b; ...)` (also `MULTIPLY`), `DIVIDE(a; b; ...)`, `MIN(a; b; ...)`, `MAX(a; b; ...)` and `AVERAGE(a; b; ...)` work per row on the given columns. For example `SUBTRACT([Meting_A]; [Meting_B])` subtracts the second value from the first; `DIVIDE([Meting_A]; [Meting_B])` divides the first by the second. With more arguments, subtraction and division are applied successively from left to right. `SUM` therefore does not add all rows of one column over time. Only combine quantities whose units match.
-- Summarising one column per day: `DAGMIN(x)`, `DAGMAX(x)`, `DAGSOM(x)` and `DAGGEM(x)` calculate the minimum, maximum, sum and mean of that column for each day.
 - Conditions: `IF(condition; value_if_true; value_if_false)`, `AND(a; b; ...)`, `OR(a; b; ...)` and `NOT(a)`.
 - Maths: `ABS(x)`, `SQRT(x)`, `ROUND(x; decimals)`, `INT(x)`, `POWER(x; y)`, `MOD(x; y)`, `LN(x)`, `LOG10(x)` and `EXP(x)`.
 - Trigonometry: `SIN(x)`, `COS(x)` and `TAN(x)` expect radians. Use `RADIANS(degrees)` or `DEGREES(radians)` to convert.
 - Time series: `DIFF(x)` gives the difference with the previous row for one column; `ROLLAVG(x; n)` gives the rolling mean over n consecutive rows.
 - Derivative and integral: `DERIVATIVE(x; unit)` (AFGELEIDE) gives the change of x per time unit; `INTEGRAL(x; unit)` (INTEGRAAL) gives the running integral over time (trapezoidal rule, missing values count as 0). The unit is `SEC`, `MIN`, `UUR` or `DAG` (also `S`, `H`, `D`) written without quotes; without a unit, hours are used. For example `INTEGRAL([Straling]; UUR)`.
-- Time and sun: `STAP()` gives the time step in hours, `UUR()` the time of the row as decimal hour, and `ZONOP(latitude; longitude; utc)` and `ZONONDER(latitude; longitude; utc)` the sunrise and sunset as decimal hour. `utc` is the difference between logger time and UTC in hours.
+- Time and sun: `STEP()` gives the time step in hours, `UUR()` the time of the row as decimal hour, and `SUNUP(latitude; longitude; utc)` and `SUNDOWN(latitude; longitude; utc)` the sunrise and sunset as decimal hour. `utc` is the difference between logger time and UTC in hours. The Dutch names `STAP`, `ZONOP` and `ZONONDER` remain available as aliases.
 
-Dutch aliases are available: `SOM` (SUM), `AFTREKKEN` (SUBTRACT), `VERMENIGVULDIGEN` (PRODUCT), `DELEN` (DIVIDE), `GEMIDDELDE` (AVERAGE), `ALS` (IF), `EN` (AND), `OF` (OR), `NIET` (NOT), `WORTEL` (SQRT), `AFRONDEN` (ROUND), `MACHT` (POWER), `REST` (MOD), `HELE` (INT), `VERSCHIL` (DIFF) and `GLIJDEND` (ROLLAVG). The daily functions also have the English aliases `DAYMIN`, `DAYMAX`, `DAYSUM`, `DAYAVG` and `DAYAVERAGE`.
+Dutch aliases are available: `SOM` (SUM), `AFTREKKEN` (SUBTRACT), `VERMENIGVULDIGEN` (PRODUCT), `DELEN` (DIVIDE), `GEMIDDELDE` (AVERAGE), `ALS` (IF), `EN` (AND), `OF` (OR), `NIET` (NOT), `WORTEL` (SQRT), `AFRONDEN` (ROUND), `MACHT` (POWER), `REST` (MOD), `HELE` (INT), `VERSCHIL` (DIFF) and `GLIJDEND` (ROLLAVG).
+
+Use pivots for daily minima, maxima, sums and means; DAGMIN, DAGMAX, DAGSOM and DAGGEM and their English aliases have been removed. Manually migrate older formulas and custom definitions using them. For sunshine duration, calculate `ZONINTERVAL([Solar_Rad_Avg])` per measurement, sum that column in a daily pivot, and optionally use `ZONPERCENTAGE([Uren_Zon])` in a daily pivot formula. Existing external configuration files are not automatically replaced on upgrade.
 
 ### Custom functions and constants
-The Edit custom functions... button opens `Configs/Functiedefs/Functies.funcdef`. Custom definitions are loaded for all loggers. A constant has the form `NAME = value_or_formula`; a function has the form `NAME(parameter1; parameter2) = formula`. Use parameters in the formula as `parameter1` or `[parameter1]`. Examples:
+The Edit custom functions... button opens `Configs/Functiedefs/Functies.funcdef`. Custom definitions are loaded for all loggers. Put the group after `@` on each definition. Use parameters in the formula as `parameter1` or `[parameter1]`. Examples:
 
-`FACTOR = 1.8`
+`FACTOR @ Maths = 1.8`
 
-`TO_CELSIUS(f) = (f - 32) / FACTOR`
+`TO_CELSIUS(f) @ Meteo = (f - 32) / FACTOR`
 
-Double-click a function in the function list to insert it with brackets; the cursor is placed between the brackets. Custom constants are inserted without brackets. Custom functions and constants are shown in blue. Custom functions can use built-in functions and constants. Names of built-in functions and constants cannot be redefined.
+Double-click a function in the function list to insert it with brackets; the cursor is placed between the brackets. Custom constants are inserted without brackets. Custom functions can use built-in functions and constants. Names of built-in functions and constants cannot be redefined.
+
+Choose visible functions... controls the list without changing which functions can be evaluated. Saving custom functions automatically updates the catalog: new functions are added, deleted ones removed, and group changes followed. Existing definitions without a group still work; saving assigns their existing group or Other. A new group initially receives a gray color.
+
+Colors, ordering and visibility are defined in `Configs/Functiedefs/Functieoverzicht.def` (JSON). Each group has a `name`, `color` as `#RRGGBB`, and a `functions` list with `name` and `visible` (true or false) per function. Change a custom function's group in the .funcdef, not the catalog. Reopen the editor after manual changes outside the app.
+
+`LEAFT(radiation)` is in the Meteo group and calculates leaf temperature. The `Leaf T.` column is no longer added automatically: add a calculated column named `Leaf T.` with `LEAFT([IR_R_R_Avg])` when needed, for example by existing charts.
+
+`DauwPunt(temperature; relative_humidity)` calculates dew point using the Magnus formula. Supply temperature in degrees Celsius and relative humidity as a percentage, for example `DauwPunt([Temperature]; [RH])`.
 
 ## Context menus
 Context menus are available by right-clicking in the Data tab, the Calc tab or a chart tab.

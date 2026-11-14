@@ -1,0 +1,401 @@
+{
+  "groups": [
+    {
+      "name": "Rekenen",
+      "color": "#1f4e78",
+      "functions": [
+        {
+          "name": "SUM",
+          "visible": true
+        },
+        {
+          "name": "SUBTRACT",
+          "visible": true
+        },
+        {
+          "name": "PRODUCT",
+          "visible": true
+        },
+        {
+          "name": "DIVIDE",
+          "visible": true
+        },
+        {
+          "name": "MIN",
+          "visible": true
+        },
+        {
+          "name": "MAX",
+          "visible": true
+        },
+        {
+          "name": "AVERAGE",
+          "visible": true
+        },
+        {
+          "name": "ABS",
+          "visible": true
+        },
+        {
+          "name": "SQRT",
+          "visible": true
+        },
+        {
+          "name": "ROUND",
+          "visible": true
+        },
+        {
+          "name": "INT",
+          "visible": true
+        },
+        {
+          "name": "POWER",
+          "visible": true
+        },
+        {
+          "name": "MOD",
+          "visible": true
+        },
+        {
+          "name": "LN",
+          "visible": true
+        },
+        {
+          "name": "LOG10",
+          "visible": true
+        },
+        {
+          "name": "EXP",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "Logica",
+      "color": "#7030a0",
+      "functions": [
+        {
+          "name": "IF",
+          "visible": true
+        },
+        {
+          "name": "AND",
+          "visible": true
+        },
+        {
+          "name": "OR",
+          "visible": true
+        },
+        {
+          "name": "NOT",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "Trigonometrie",
+      "color": "#833c00",
+      "functions": [
+        {
+          "name": "SIN",
+          "visible": true
+        },
+        {
+          "name": "COS",
+          "visible": true
+        },
+        {
+          "name": "TAN",
+          "visible": true
+        },
+        {
+          "name": "RADIANS",
+          "visible": true
+        },
+        {
+          "name": "DEGREES",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "Tijdreeksen",
+      "color": "#548235",
+      "functions": [
+        {
+          "name": "DIFF",
+          "visible": true
+        },
+        {
+          "name": "ROLLAVG",
+          "visible": true
+        },
+        {
+          "name": "STEP",
+          "visible": true
+        },
+        {
+          "name": "UUR",
+          "visible": true
+        },
+        {
+          "name": "DERIVATIVE",
+          "visible": true
+        },
+        {
+          "name": "INTEGRAL",
+          "visible": true
+        },
+        {
+          "name": "FIRST_DERIVATIVE",
+          "visible": true
+        },
+        {
+          "name": "SECOND_DERIVATIVE",
+          "visible": true
+        },
+        {
+          "name": "CUMULATIVE_INTEGRAL",
+          "visible": true
+        },
+        {
+          "name": "INTEGRAL_DEVIATION",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "Meteo",
+      "color": "#0066cc",
+      "functions": [
+        {
+          "name": "ALBEDO",
+          "visible": true
+        },
+        {
+          "name": "LEAFT",
+          "visible": true
+        },
+        {
+          "name": "DewPoint",
+          "visible": true
+        },
+        {
+          "name": "SUNUP",
+          "visible": true
+        },
+        {
+          "name": "SUNDOWN",
+          "visible": true
+        },
+        {
+          "name": "LAT",
+          "visible": true
+        },
+        {
+          "name": "LON",
+          "visible": true
+        },
+        {
+          "name": "UTC",
+          "visible": true
+        },
+        {
+          "name": "ZonInterval",
+          "visible": true
+        },
+        {
+          "name": "DAGLENGTE",
+          "visible": true
+        },
+        {
+          "name": "ZonPercentage",
+          "visible": true
+        },
+        {
+          "name": "CloudBase",
+          "visible": true
+        },
+        {
+          "name": "SatVapor",
+          "visible": true
+        },
+        {
+          "name": "VaporPressure",
+          "visible": true
+        },
+        {
+          "name": "VPD",
+          "visible": true
+        },
+        {
+          "name": "AbsHumidity",
+          "visible": true
+        },
+        {
+          "name": "SpecHumidity",
+          "visible": true
+        },
+        {
+          "name": "TempK",
+          "visible": true
+        },
+        {
+          "name": "TempDiff",
+          "visible": true
+        },
+        {
+          "name": "TempGradient",
+          "visible": true
+        },
+        {
+          "name": "PotentialTemp",
+          "visible": true
+        },
+        {
+          "name": "AirDensity",
+          "visible": true
+        },
+        {
+          "name": "MoistAirDensity",
+          "visible": true
+        },
+        {
+          "name": "ALBEDO_PCT",
+          "visible": true
+        },
+        {
+          "name": "NetShortWave",
+          "visible": true
+        },
+        {
+          "name": "NetLongWave",
+          "visible": true
+        },
+        {
+          "name": "NetRadiation",
+          "visible": true
+        },
+        {
+          "name": "RadiationEnergy",
+          "visible": true
+        },
+        {
+          "name": "GustFactor",
+          "visible": true
+        },
+        {
+          "name": "WindU",
+          "visible": true
+        },
+        {
+          "name": "WindV",
+          "visible": true
+        },
+        {
+          "name": "WindKmh",
+          "visible": true
+        },
+        {
+          "name": "WindBeaufort",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "Other",
+      "color": "#555555",
+      "functions": []
+    },
+    {
+      "name": "Luchtkwaliteit",
+      "color": "brown",
+      "functions": [
+        {
+          "name": "PPMtoMG",
+          "visible": true
+        },
+        {
+          "name": "PPBtoUG",
+          "visible": true
+        },
+        {
+          "name": "ConcentrationDiff",
+          "visible": true
+        },
+        {
+          "name": "ConcentrationRatio",
+          "visible": true
+        },
+        {
+          "name": "ConcentrationChange",
+          "visible": true
+        },
+        {
+          "name": "CO",
+          "visible": true
+        },
+        {
+          "name": "CO₂",
+          "visible": true
+        },
+        {
+          "name": "NO",
+          "visible": true
+        },
+        {
+          "name": "NO₂",
+          "visible": true
+        },
+        {
+          "name": "O₃",
+          "visible": true
+        },
+        {
+          "name": "SO₂",
+          "visible": true
+        },
+        {
+          "name": "NH₃",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "Analyse",
+      "color": "#555555",
+      "functions": [
+        {
+          "name": "TempAnomaly",
+          "visible": true
+        },
+        {
+          "name": "TempRange",
+          "visible": true
+        },
+        {
+          "name": "VPD_Daily",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "Klimaat",
+      "color": "#555555",
+      "functions": [
+        {
+          "name": "TempDiffF",
+          "visible": true
+        },
+        {
+          "name": "HeatingDegreeDays",
+          "visible": true
+        },
+        {
+          "name": "CoolingDegreeDays",
+          "visible": true
+        }
+      ]
+    }
+  ]
+}

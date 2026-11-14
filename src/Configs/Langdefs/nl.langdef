@@ -93,6 +93,9 @@ axis.percentage=Percentage
 hover.value=Waarde
 
 # Spreadsheets
+column_search.label=Kolom zoeken:
+column_search.go=Ga naar
+column_search.not_found=Kolom '{name}' bestaat niet in deze tabel.
 page.label=Rijen {first}-{last} van {count} | pagina {page} van {pages}
 calc.formula_errors=Niet alle formules konden worden berekend:
 calc.errors={count} fout(en): {errors}
@@ -127,6 +130,7 @@ logdef.name=Naam
 logdef.type=Type
 logdef.type.bar_grouped=Staaf naast elkaar
 logdef.type.bar_range=Staaf min-gem-max
+logdef.type.bar_grouped_range=Min-gem-max per sensor
 logdef.minimum=Minimum
 logdef.maximum=Maximum
 logdef.number_format=Getalformaat
@@ -140,11 +144,14 @@ logdef.save_as=Opslaan als .logdef...
 logdef.hint_time=Gekozen kolommen (tijd wordt automatisch x-as)
 logdef.hint_grouped=Kolommen naast elkaar (tijd wordt automatisch x-as)
 logdef.hint_range=Voeg een voor een toe: minimum, gemiddelde, maximum (zelfde tijdsbasis)
+logdef.hint_grouped_range=Voeg per sensor drie kolommen toe in volgorde minimum, gemiddelde, maximum; herhaal per sensor. De grafiek toont min-gem-max-bereiken naast elkaar.
 logdef.range_columns='{name}': kies precies drie kolommen in de volgorde minimum, gemiddelde, maximum.
+logdef.grouped_range_columns='{name}': voeg minstens twee complete drietallen toe in volgorde minimum, gemiddelde, maximum.
 logdef.auto_time='{name}': kies geen tijdkolom; die wordt automatisch toegevoegd.
-chart.range_order=Bereikgrafiek: minimum moet kleiner dan of gelijk aan gemiddelde en maximum zijn, en gemiddelde kleiner dan of gelijk aan maximum.
-chart.range_order_details=Bereikgrafiek: minimum ≤ gemiddelde ≤ maximum vereist. Controleer de kolomvolgorde en brongegevens. Bij {time}: minimum '{minimum}' = {min_value}, gemiddelde '{mean}' = {mean_value}, maximum '{maximum}' = {max_value}.
-chart.range_period=Bereikgrafiek: kies drie kolommen met dezelfde tijdsbasis.
+chart.range_order=Min-gem-max-grafiek: minimum ≤ gemiddelde ≤ maximum vereist.
+chart.range_order_details=Min-gem-max-grafiek: controleer de kolomvolgorde en brongegevens. Bij {time}: minimum '{minimum}' = {min_value}, gemiddelde '{mean}' = {mean_value}, maximum '{maximum}' = {max_value}.
+chart.range_period=Min-gem-max-grafiek: kies kolommen met dezelfde tijdsbasis.
+chart.grouped_range_columns=Min-gem-max per sensor vereist minstens twee complete drietallen kolommen.
 chart.range_columns=Bereikgrafiek vereist drie kolommen: minimum, gemiddelde, maximum.
 chart.bar_secondary=Deze staafgrafiek ondersteunt geen secundaire as.
 logdef.hint_scatter=Kies precies twee kolommen: eerste = Y, tweede = X
@@ -172,6 +179,19 @@ formula.columns_title=Kolommen (dubbelklik = invoegen)
 formula.functions_title=Functies (dubbelklik = invoegen)
 formula.test=Test formule
 formula.edit_functions=Eigen functies bewerken...
+formula.select_functions=Zichtbare functies kiezen...
+formula.select_functions_hint=Selecteer de functies die in de lijst zichtbaar moeten zijn.
+formula.edit_catalog=Functieoverzicht bewerken...
+formula.catalog_editor=Functieoverzicht
+formula.catalog_editor_title=Functieoverzicht - {name}
+formula.catalog_editor_hint=Bewerk groepen, kleuren en functies in JSON. Groepen van eigen functies staan in Functies.funcdef.
+formula.find=Zoeken:
+formula.find_previous=Vorige
+formula.find_next=Volgende
+formula.find_none=Geen resultaten
+formula.find_count={current}/{total}
+formula.catalog_invalid=Ongeldig functieoverzicht {path}: {error}
+formula.catalog_other=Overig
 formula.save_apply=Opslaan en toepassen
 formula.own_functions=Eigen functies
 formula.own_functions_title=Eigen functies - {name}
@@ -183,8 +203,8 @@ formula.unique_names=Elke formule moet een unieke naam hebben.
 
 # Formulefouten
 ferr.invalid_formula=Ongeldige formule in {name}:{line}
-ferr.invalid_definition=Ongeldige definitie in {source}:{line}
-ferr.builtin_name='{name}' is een ingebouwde naam ({source}:{line})
+ferr.invalid_definition=Ongeldige definitie op regel {line} in {source}
+ferr.builtin_name='{name}' is een ingebouwde naam (regel {line} in {source})
 ferr.own_constant={name} - eigen constante
 ferr.own_function={name}({params}) - eigen functie
 ferr.column_missing=Kolom '{name}' bestaat niet.
@@ -208,10 +228,6 @@ ferr.name_missing=Naam ontbreekt.
 ferr.name_exists=Er bestaat al een kolom met deze naam.
 
 # Functiebeschrijvingen
-func.DAGMIN=DAGMIN([kolom]) - minimum per dag
-func.DAGMAX=DAGMAX([kolom]) - maximum per dag
-func.DAGSOM=DAGSOM([kolom]) - totaal per dag
-func.DAGGEM=DAGGEM([kolom]) - gemiddelde per dag
 func.SUM=SUM(a; b; ...) - som per rij (SOM)
 func.SUBTRACT=SUBTRACT(a; b; ...) - trek waarden per rij van elkaar af (AFTREKKEN)
 func.PRODUCT=PRODUCT(a; b; ...) - vermenigvuldig waarden per rij (MULTIPLY)
@@ -239,7 +255,7 @@ func.RADIANS=RADIANS(graden)
 func.DEGREES=DEGREES(radialen)
 func.DIFF=DIFF(x) - verschil met vorige rij (VERSCHIL)
 func.ROLLAVG=ROLLAVG(x; n) - voortschrijdend gemiddelde over n rijen (GLIJDEND)
-func.STAP=STAP() - tijdstap van de data in uren
+func.STEP=STEP() - tijdstap van de data in uren (STAP)
 func.DERIVATIVE=DERIVATIVE(x; eenheid) - afgeleide per tijdseenheid: SECOND, MINUTE, HOUR of DAY (AFGELEIDE)
 func.INTEGRAL=INTEGRAL(x; eenheid) - lopende integraal over de tijd: SECOND, MINUTE, HOUR of DAY (INTEGRAAL)
 func.FIRST_DERIVATIVE=FIRST_DERIVATIVE(x; eenheid) - eerste afgeleide per tijdseenheid (EERSTE_AFGELEIDE)
@@ -247,6 +263,6 @@ func.SECOND_DERIVATIVE=SECOND_DERIVATIVE(x; eenheid) - tweede afgeleide per tijd
 func.CUMULATIVE_INTEGRAL=CUMULATIVE_INTEGRAL(x; eenheid) - cumulatieve trapeziumintegraal (CUMULATIEVE_INTEGRAAL)
 func.INTEGRAL_DEVIATION=INTEGRAL_DEVIATION(x; eenheid) - cumulatieve integraal van x minus het gemiddelde (INTEGRAAL_VAN_AFWIJKING)
 func.UUR=UUR() - tijdstip van de rij als decimaal uur (0-24)
-func.ZONOP=ZONOP(breedte; lengte; utc-verschil) - zonsopkomst in decimaal uur
-func.ZONONDER=ZONONDER(breedte; lengte; utc-verschil) - zonsondergang in decimaal uur
-funcdef.header=# Eigen functies en constanten (worden voor alle loggers geladen)\n# Constante:  NAAM = waarde of formule\n# Functie:    NAAM(param1; param2) = formule   (parameters als [param1] of param1)\n
+func.SUNUP=SUNUP(breedte; lengte; utc-verschil) - zonsopkomst in decimaal uur (ZONOP)
+func.SUNDOWN=SUNDOWN(breedte; lengte; utc-verschil) - zonsondergang in decimaal uur (ZONONDER)
+funcdef.header=# Eigen functies en constanten (worden voor alle loggers geladen)\n# Constante:  NAAM @ Groep = waarde of formule\n# Functie:    NAAM(param1; param2) @ Groep = formule   (parameters als [param1] of param1)\n

@@ -1,6 +1,7 @@
 # name;type;columns;minimum;maximum;number format;tab color
 # type=windroos uses one direction-column header in columns; omit the line for loggers without a windrose.
 # tab color: hex code or a readable color name
+# optional eighth field: linear (scatter trendline)
 Wind F.;windroos;Wind_Dir_WVT;;;;cyan
 Wind;line;TIMESTAMP,Wind_24_m_Avg,Wind_32_m_Avg,Wind_40_m,Wind_40_m_TMx@secondary;;;0.0;cyan
 Wind 40 m;line;TIMESTAMP,Wind_40_m_old_Avg,Wind_40_m;;;0.0;cyan
@@ -21,7 +22,13 @@ CMP6;line;TIMESTAMP,Solar_Rad_Avg;;;0.0;yellow
 VGL CNR1_CMP6;scatter;Solar_R_I_Avg,Solar_Rad_Avg;;;0.0;yellow
 Uren zon;line;TIMESTAMP,Sun_Hours_Tot;;;0.0;
 ETO;line;TIMESTAMP,ETo;;;0.0;
-IR_test;line;TIMESTAMP,IR_R_I_Avg,IR_R_R_Avg,IR_test@secondary;;;0.0;purple
-DagLengte;line;TIMESTAMP,DagLengte,Uren_Zon@secondary;;;0.0;yellow
-test;line;TIMESTAMP,test;;;0.0;
-int & diff test;line;TIMESTAMP,integ test,differ test@secondary;;;0.0;
+IR_test;line;TIMESTAMP,IR_R_I_Avg,IR_R_R_Avg;;;0.0;purple
+DagLengte;bar_grouped;TIMESTAMP,DagLengte,Sun_Hours_Tot;;;0.0;yellow
+TFal SUM test;line;TIMESTAMP,TFal SUM Test,T_Fall_1_Tot,T_Fall_2_Tot@secondary;;;0.0;
+wind test;line;TIMESTAMP,Wind_40_m,Diff1 HOUR@secondary,Diff2 HOUR@secondary;;;0.0;
+Pivot test;bar_range;TIMESTAMP,Temp Day Min,Temp Day Mean,Temp Day Max;;;0.0;
+PIVOT LFWet;bar_grouped_range;TIMESTAMP,LFWet1 Min,LFwet1 mean,LFWet1 Max,LFWet2 Min,LFWet2 Mean,LFWet2 Max,LFWet3 Min,LFWet3 Mean,LFWet3 Max;;;0.0;
+vgl;scatter;Temp_24_m_Avg,Temp_40_m_Avg;;;0.0;;linear
+LeafT;line;TIMESTAMP,LeafT;;;0.0;
+Dauwpunt;line;TIMESTAMP,Dauwpunt 02m,Dauwpunt 24m,Dauwpunt 40m;;;0.0;
+Vgl Albedo;line;TIMESTAMP,Albedo_Avg,Albedo calc@secondary;;;0.0;

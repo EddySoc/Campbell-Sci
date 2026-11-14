@@ -4,10 +4,9 @@ import csv
 import math
 from pathlib import Path
 import re
-import shutil
 import sys
 from tkinter import ttk
-from typing import Any
+from typing import Any, Callable
 
 import matplotlib
 matplotlib.use("TkAgg")
@@ -20,6 +19,7 @@ import pandas as pd
 from PIL import Image, ImageOps, ImageTk, UnidentifiedImageError
 from tkinter import font as tkfont
 from formulas import apply_formulas, load_formulas, load_funcdefs
+from app_config import prepare_external_configs
 from logdef_format import parse_chart_fields
 from pivots import PERIODS, calculate_pivots, load_pivots, pivot_path
 from i18n import available_languages, current_language, init_language, set_language as apply_language, t
@@ -56,24 +56,6 @@ def application_icon_path() -> Path:
     if getattr(sys, "frozen", False):
         return Path(__file__).with_name("CampBell Icon.ico")
     return Path(__file__).resolve().parent.parent / "screenshots" / "CampBell Icon.ico"
-
-
-def prepare_external_configs() -> None:
-    if not getattr(sys, "frozen", False):
-        return
-
-    bundled_configs = Path(__file__).with_name("Configs")
-    if not bundled_configs.is_dir():
-        raise FileNotFoundError(t("err.bundled_configs_missing", path=bundled_configs))
-
-    CONFIGS_DIR.mkdir(parents=True, exist_ok=True)
-    for source in bundled_configs.rglob("*"):
-        destination = CONFIGS_DIR / source.relative_to(bundled_configs)
-        if source.is_dir():
-            destination.mkdir(parents=True, exist_ok=True)
-        elif not destination.exists():
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, destination)
 
 
 def _read_generic_csv(path: Path, lines: list[str]) -> pd.DataFrame:
@@ -303,6 +285,37 @@ def _x_values(series: pd.Series) -> tuple[pd.Series, bool]:
     if numbers.notna().sum() >= max(2, int(len(series) * 0.5)):
         return numbers, False
     return pd.Series(range(len(series)), index=series.index), False
+
+
+class ColumnSearch(ttk.Frame):
+    def __init__(self, parent: tk.Misc, table: ttk.Treeview, on_found: Callable[[int], None] | None = None):
+        super().__init__(parent)
+        self.table = table
+        self.on_found = on_found
+        ttk.Label(self, text=t("column_search.label")).pack(side="left", padx=(8, 4))
+        self.entry = ttk.Entry(self, width=22)
+        self.entry.pack(side="left")
+        self.entry.bind("<Return>", self._search)
+        ttk.Button(self, text=t("column_search.go"), command=self._search).pack(side="left", padx=4)
+
+    def _search(self, _event: object = None) -> str:
+        query = self.entry.get().strip()
+        columns = [str(column) for column in self.table["columns"]]
+        index = next((i for i, name in enumerate(columns) if name == query), None)
+        if index is None:
+            index = next((i for i, name in enumerate(columns) if name.casefold() == query.casefold()), None)
+        if not query or index is None:
+            messagebox.showinfo(t("column_search.label"), t("column_search.not_found", name=query), parent=self)
+            return "break"
+        self.table.update_idletasks()
+        widths = [int(self.table.column(column, "width")) for column in columns]
+        total = sum(widths)
+        if total:
+            left = sum(widths[:index]) + widths[index] / 2 - self.table.winfo_width() / 2
+            self.table.xview_moveto(max(0.0, left / total))
+        if self.on_found:
+            self.on_found(index)
+        return "break"
 
 
 class ReadOnlyCellSelection:
@@ -712,6 +725,13 @@ class CampbellViewer:
         errors: list[str] = []
         try:
             definitions = load_pivots(pivot_path(self.logger, self.location, PIVOT_DIR))
+            available = []
+            for definition in definitions:
+                if definition["column"] not in self.chart_data.columns:
+                    errors.append(t("err.column_not_in_data", name=definition["column"]))
+                else:
+                    available.append(definition)
+            definitions = available
             self.pivot_frames = calculate_pivots(self.chart_data, self.header_row_count, definitions)
             self.pivot_bases = {period: frame.copy() for period, frame in self.pivot_frames.items()}
             for period, frame in self.pivot_frames.items():
@@ -762,6 +782,8 @@ class CampbellViewer:
         ttk.Button(bottom, text=t("button.previous"), command=lambda: self._change_pivot_page(-1)).pack(side="left")
         ttk.Label(bottom, textvariable=self.pivot_page_label).pack(side="left", padx=12)
         ttk.Button(bottom, text=t("button.next"), command=lambda: self._change_pivot_page(1)).pack(side="left")
+        ColumnSearch(bottom, self.pivot_table,
+                     lambda index: self._select_search_column(self.pivot_table, self.pivot_selection, index)).pack(side="right")
         if self.pivot_periods:
             self.pivot_choice.current(0)
         self._change_pivot_period()
@@ -847,6 +869,8 @@ class CampbellViewer:
         ttk.Button(controls, text=t("button.next"), command=lambda: self._change_data2_page(1)).pack(side="left")
         self.data2_table = table
         self.data2_selection = ReadOnlyCellSelection(table)
+        ColumnSearch(controls, table,
+                     lambda index: self._select_search_column(table, self.data2_selection, index)).pack(side="right")
         self.data2_columns = columns
         self._show_data2_page()
         if self.formula_errors:
@@ -973,8 +997,27 @@ class CampbellViewer:
         table.bind("<Double-1>", self._begin_cell_edit)
         table.bind("<Key>", self._on_table_key)
         self._edit_entry: tk.Entry | None = None
+        ColumnSearch(controls, table, self._select_data_search_column).pack(side="right")
         self._add_spreadsheet_menu(table)
         self._show_page()
+
+    @staticmethod
+    def _visible_table_item(table: ttk.Treeview) -> str:
+        return next((item for item in table.get_children() if table.bbox(item)), "")
+
+    def _select_data_search_column(self, index: int) -> None:
+        self._finish_cell_edit(save=True)
+        item = self._cursor[0] if self._cursor else self._visible_table_item(self.table)
+        if item:
+            self._set_cursor(item, f"#{index + 1}")
+        self._mark_column(index)
+        self.table.focus_set()
+
+    def _select_search_column(self, table: ttk.Treeview, selection: ReadOnlyCellSelection, index: int) -> None:
+        item = selection.cursor[0] if selection.cursor else self._visible_table_item(table)
+        if item:
+            selection.set_cursor(item, f"#{index + 1}")
+        table.focus_set()
 
     def _make_cell_label(self, cursor: bool) -> tk.Label:
         label = tk.Label(
@@ -1306,7 +1349,7 @@ class CampbellViewer:
             self._draw_scatter(axes, spec, headers, data)
             axes_list = [axes]
             is_wind_rose = False
-        elif chart_type in {"bar_grouped", "bar_range"}:
+        elif chart_type in {"bar_grouped", "bar_range", "bar_grouped_range"}:
             self._draw_special_bars(axes, spec, headers, data)
             axes_list = [axes]
             is_wind_rose = False
@@ -1610,7 +1653,7 @@ class CampbellViewer:
         elif spec["type"] == "scatter":
             self._draw_scatter(axes, spec, headers, self.chart_data)
             restored_axes = [axes]
-        elif spec["type"] in {"bar_grouped", "bar_range"}:
+        elif spec["type"] in {"bar_grouped", "bar_range", "bar_grouped_range"}:
             self._draw_special_bars(axes, spec, headers, self.chart_data)
             restored_axes = [axes]
         else:
@@ -1621,10 +1664,13 @@ class CampbellViewer:
         self, axes: Any, spec: dict[str, Any], headers: dict[str, str], data: pd.DataFrame,
     ) -> None:
         columns = spec["columns"]
+        grouped_range = spec["type"] == "bar_grouped_range"
         if len(columns) < 2:
             raise ValueError(t("err.line_chart_needs_columns"))
         if spec["type"] == "bar_range" and len(columns) != 4:
             raise ValueError(t("chart.range_columns"))
+        if grouped_range and (len(columns) - 1 < 6 or (len(columns) - 1) % 3):
+            raise ValueError(t("chart.grouped_range_columns"))
         x_column, _ = _resolve_header(headers, columns[0])
         series: list[tuple[str, pd.DataFrame, pd.Series, pd.Series]] = []
         is_date: bool | None = None
@@ -1648,13 +1694,22 @@ class CampbellViewer:
             is_date = dates
             series.append((column, frame, x, pd.to_numeric(frame[column], errors="coerce")))
 
-        if spec["type"] == "bar_range" and any(item[1] is not series[0][1] for item in series[1:]):
+        if spec["type"] in {"bar_range", "bar_grouped_range"} and any(
+            item[1] is not series[0][1] for item in series[1:]
+        ):
             raise ValueError(t("chart.range_period"))
         positions: list[float] = []
-        for _, _, x, y in series:
-            valid = x.notna() & y.notna()
-            values = mdates.date2num(x[valid].to_numpy()) if is_date else x[valid].to_numpy()
-            positions.extend(float(value) for value in values if math.isfinite(float(value)))
+        if grouped_range:
+            for start in range(0, len(series), 3):
+                group = series[start:start + 3]
+                valid = group[0][2].notna() & group[0][3].notna() & group[1][3].notna() & group[2][3].notna()
+                values = mdates.date2num(group[0][2][valid].to_numpy()) if is_date else group[0][2][valid].to_numpy()
+                positions.extend(float(value) for value in values if math.isfinite(float(value)))
+        else:
+            for _, _, x, y in series:
+                valid = x.notna() & y.notna()
+                values = mdates.date2num(x[valid].to_numpy()) if is_date else x[valid].to_numpy()
+                positions.extend(float(value) for value in values if math.isfinite(float(value)))
         unique = sorted(set(positions))
         if not unique:
             raise ValueError(t("err.no_plottable_data"))
@@ -1693,6 +1748,54 @@ class CampbellViewer:
             points = axes.collections[-1]
             points._campbell_row_indices = rows
             points._campbell_column = series[1][0]
+            zero_line = axes.axhline(0, color="#263442", linewidth=1.5, zorder=5)
+            zero_line._campbell_zero_line = True
+            axes.autoscale_view(scalex=False, scaley=True)
+        elif grouped_range:
+            sensor_count = len(series) // 3
+            group_width = width / sensor_count
+            bar_width = group_width * 0.9
+            for sensor_index in range(sensor_count):
+                group = series[sensor_index * 3:sensor_index * 3 + 3]
+                low, mean, high = (item[3] for item in group)
+                x = group[0][2]
+                valid = x.notna() & low.notna() & mean.notna() & high.notna()
+                if not valid.any():
+                    continue
+                invalid = valid & ((low > mean) | (mean > high))
+                if invalid.any():
+                    position = int(invalid.to_numpy().nonzero()[0][0])
+                    raise ValueError(t(
+                        "chart.range_order_details",
+                        time=x.iloc[position],
+                        minimum=group[0][0], min_value=f"{low.iloc[position]:.6g}",
+                        mean=group[1][0], mean_value=f"{mean.iloc[position]:.6g}",
+                        maximum=group[2][0], max_value=f"{high.iloc[position]:.6g}",
+                    ))
+                xs = mdates.date2num(x[valid].to_numpy()) if is_date else x[valid].to_numpy()
+                rows = list(group[0][1].index[valid])
+                centers = xs + (sensor_index - (sensor_count - 1) / 2) * group_width
+                lower = axes.bar(
+                    centers, mean[valid] - low[valid], bottom=low[valid], width=bar_width,
+                    color=LINE_COLORS[0], label=f"{group[0][0]} - {group[1][0]}",
+                )
+                upper = axes.bar(
+                    centers, high[valid] - mean[valid], bottom=mean[valid], width=bar_width,
+                    color=LINE_COLORS[1], label=f"{group[1][0]} - {group[2][0]}",
+                )
+                for patch, row in zip(lower, rows):
+                    patch.sticky_edges.y.clear()
+                    patch._campbell_target = (row, group[0][0])
+                for patch, row in zip(upper, rows):
+                    patch.sticky_edges.y.clear()
+                    patch._campbell_target = (row, group[2][0])
+                axes.scatter(
+                    centers, mean[valid], color=LINE_COLORS[2], marker="_", s=70, zorder=3,
+                    label=group[1][0],
+                )
+                points = axes.collections[-1]
+                points._campbell_row_indices = rows
+                points._campbell_column = group[1][0]
             zero_line = axes.axhline(0, color="#263442", linewidth=1.5, zorder=5)
             zero_line._campbell_zero_line = True
             axes.autoscale_view(scalex=False, scaley=True)
@@ -2212,9 +2315,6 @@ class CampbellViewer:
             location = logger_and_location_from_filename(source)[1]
             if logger in {"BM", "BRAS"}:
                 data = data.replace(["6999", "-6999", "7999", "-7999", "NAN", "INF"], float("nan"))
-                if "IR_R_R_Avg" in data.columns:
-                    infrared = pd.to_numeric(data["IR_R_R_Avg"], errors="coerce")
-                    data["Leaf T."] = (infrared / 0.0000000567) ** 0.25 - 273.16
             self.data, self.source, self.logger, self.location, self.page = data, source, logger, location, 0
             self.data2_page = 0
             self._data_changed = False

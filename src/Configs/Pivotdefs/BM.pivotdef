@@ -1,0 +1,98 @@
+[
+  {
+    "name": "Uren_Zon",
+    "column": "Zoninterval",
+    "period": "day",
+    "aggregation": "sum"
+  },
+  {
+    "name": "Temp Day Min",
+    "column": "Temp_02_m_Avg",
+    "period": "day",
+    "aggregation": "min"
+  },
+  {
+    "name": "Temp Day Max",
+    "column": "Temp_02_m_Avg",
+    "period": "day",
+    "aggregation": "max"
+  },
+  {
+    "name": "Temp Day Mean",
+    "column": "Temp_02_m_Avg",
+    "period": "day",
+    "aggregation": "mean"
+  },
+  {
+    "name": "Temp Week Min",
+    "column": "Temp_02_m_Avg",
+    "period": "week",
+    "aggregation": "min"
+  },
+  {
+    "name": "Temp Week Max",
+    "column": "Temp_02_m_Avg",
+    "period": "week",
+    "aggregation": "max"
+  },
+  {
+    "name": "Temp Week Mean",
+    "column": "Temp_02_m_Avg",
+    "period": "week",
+    "aggregation": "mean"
+  },
+  {
+    "name": "LFwet1 mean",
+    "column": "lfWet(1)",
+    "period": "day",
+    "aggregation": "mean"
+  },
+  {
+    "name": "LFWet2 Mean",
+    "column": "lfWet(2)",
+    "period": "day",
+    "aggregation": "mean"
+  },
+  {
+    "name": "LFWet3 Mean",
+    "column": "lfWet(3)",
+    "period": "day",
+    "aggregation": "mean"
+  },
+  {
+    "name": "LFWet1 Min",
+    "column": "lfWet(1)",
+    "period": "day",
+    "aggregation": "min"
+  },
+  {
+    "name": "LFWet2 Min",
+    "column": "lfWet(2)",
+    "period": "day",
+    "aggregation": "min"
+  },
+  {
+    "name": "LFWet3 Min",
+    "column": "lfWet(3)",
+    "period": "day",
+    "aggregation": "min"
+  },
+  {
+    "name": "LFWet1 Max",
+    "column": "lfWet(1)",
+    "period": "day",
+    "aggregation": "max"
+  },
+  {
+    "name": "LFWet2 Max",
+    "column": "lfWet(2)",
+    "period": "day",
+    "aggregation": "max"
+  },
+  {
+    "name": "LFWet3 Max",
+    "column": "lfWet(3)",
+    "period": "day",
+    "aggregation": "max"
+  }
+]
