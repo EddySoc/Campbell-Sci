@@ -3,6 +3,8 @@
 A standalone Windows application for viewing and editing Campbell Scientific
 data files.
 
+Screenshots below illustrate the features; some show an earlier interface.
+
 ## Download and start
 
 1. Download the [latest onefile release](https://github.com/EddySoc/Campbell-Sci/releases/latest/download/Campbel.Sci.Viewer.zip) and extract it.
@@ -28,9 +30,17 @@ If no chart configuration is found, the viewer creates a line chart for each
 numeric measurement column.
 The tab strip can be scrolled with the arrow buttons or the mouse wheel.
 
+**Measurement data**
+
+![Measurement data table](screenshots/Datasheet.png)
+
 Use the mouse wheel over a chart to zoom horizontally. Place the pointer over
 the left or right plot margin and use the wheel to scroll through the
 measurement period. Hover over a line to see its column, time, and value.
+
+**Zooming and navigating a chart**
+
+![Zoomed chart](screenshots/Graph%20Zoom%20pan.png)
 
 ## Edit measurements and charts
 
@@ -50,6 +60,29 @@ only when `Hoogte` is explicitly included in that graph's `.logdef`; add
 saved directly, while new configurations require a file choice. **Save as**
 remains available, but a file outside the active logger/location configuration
 is not automatically applied.
+
+**LogDef Editor**
+
+![LogDef Editor](screenshots/LogDef%20Editor.png)
+
+**Chart examples**
+
+Series on the same plot:
+
+![Series on the same plot](screenshots/Graph%20zelfde%20as.dat.png)
+
+Series on separate plots:
+
+![Series on separate plots](screenshots/Graph%20gesplitst.dat.png)
+
+A chart with a secondary axis:
+
+![Chart with a secondary axis](screenshots/Graph%20herschaal.dat.png)
+
+Wind rose:
+
+![Wind rose chart](screenshots/Graph%20windroos.dat.png)
+
 For scatter charts choose exactly two columns, first Y and then X; this order
 preserves existing configurations. Optionally enable a linear trendline with
 its equation and R². At least two valid points with different X values are
@@ -68,6 +101,10 @@ All bar types add the time column automatically and leave existing bar charts
 unchanged.
 
 ## Formulas and custom functions
+
+**Formula Editor**
+
+![Formula Editor](screenshots/Functie%20Editor.png)
 
 Use **Formula Editor** to add calculated columns. Refer to a measurement by
 putting its column name in square brackets, for example:
@@ -92,11 +129,15 @@ Both text editors provide case-insensitive search with Previous/Next navigation
 and Ctrl+F. Formulas and custom functions are stored in `Configs/Formuladefs`
 and `Configs/Functiedefs`.
 
-## Screenshots
+**Custom functions editor**
+
+![Custom functions editor with search](screenshots/Custom%20Functions%20editor.png)
+
+**Function catalog editor**
 
 ![Function catalog editor with search](screenshots/Function%20Catalog%20Editor.png)
 
-![Custom functions editor with search](screenshots/Custom%20Functions%20editor.png)
+**Choose visible functions**
 
 ![Choose visible functions](screenshots/Choice%20Visible%20functions.dat.png)
 
@@ -126,6 +167,10 @@ saved. Language files are in `Configs/Langdefs` (`<code>.langdef`). Optional
 translated help files can be placed in `Configs/Helpdefs` as
 `Campbell_Sci.<code>.helpdef`. The English help text is
 `Configs/Helpdefs/Campbell_Sci.en.helpdef`.
+
+**In-app help**
+
+![In-app help](screenshots/Help.png)
 
 Menu configurations are in `Configs/Menudefs`. Configuration files can be
 adapted directly; names of functions and charts in user configurations are not
