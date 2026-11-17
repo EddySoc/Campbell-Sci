@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 from pathlib import Path
+from PyInstaller.utils.hooks import collect_submodules
 
 project_dir = Path(SPECPATH)
 icon_path = project_dir.parent / 'screenshots' / 'CampBell Icon.ico'
@@ -13,7 +14,7 @@ a = Analysis(
         (str(project_dir / 'Configs'), 'Configs'),
         (str(icon_path), '.'),
     ],
-    hiddenimports=[],
+    hiddenimports=collect_submodules('addons') + collect_submodules('scipy'),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

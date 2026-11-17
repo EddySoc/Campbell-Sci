@@ -155,16 +155,16 @@ and `Configs/Functiedefs`.
 
 ## Add, remove and reorder columns
 
-Use **Add columns** to add columns from another file of the same measurement
-period (for example IM_, WX_ or PA_ columns to a BM_ file). Choose the file,
-then the columns. The files are matched on identical timestamps; if no
+Open **Manage columns** and press **Add** to add columns from another file of
+the same measurement period (for example IM_, WX_ or PA_ columns to a BM_
+file). Choose the file, then the columns. The files are matched on identical timestamps; if no
 timestamp matches at all, a message is shown and nothing is added. Duplicate
 column names are prefixed with the logger name (for example `IM_T`).
 
 ![Add columns](screenshots/Add%20columns.png)
 
-Use **Manage columns** to move columns up or down or delete them, then choose
-**Apply**. Deleted columns also disappear from charts and Pivot definitions
+In the same window you can move columns up or down or delete them, then choose
+**Apply** (apply pending changes before adding columns). Deleted columns also disappear from charts and Pivot definitions
 (a chart without any remaining series is removed). **Save** writes the result
 to a new file.
 

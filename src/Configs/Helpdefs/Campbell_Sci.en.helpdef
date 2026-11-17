@@ -28,8 +28,8 @@ For a wind rose the first column is the wind direction. If you add extra columns
 Charts that cannot be built (for example because their columns contain no data or were removed) are not shown; one message lists all of them.
 
 ## Adding and managing columns
-Use Add columns to add columns from another file of the same measurement period (for example IM_, WX_ or PA_ columns to a BM_ file). Choose the file and then the columns. The files are matched on identical timestamps; if no timestamp matches at all, a message is shown and nothing is added. Duplicate column names are prefixed with the logger name (for example IM_T).
-Use Manage columns to move or delete columns and confirm with Apply. Deleted columns also disappear from charts and Pivot definitions (a chart without remaining series is removed). Save writes the result to a new file.
+Open Manage columns and press Add to add columns from another file of the same measurement period (for example IM_, WX_ or PA_ columns to a BM_ file). Choose the file and then the columns. The files are matched on identical timestamps; if no timestamp matches at all, a message is shown and nothing is added. Duplicate column names are prefixed with the logger name (for example IM_T).
+In the same window you can move or delete columns and confirm with Apply (do this before adding columns). Deleted columns also disappear from charts and Pivot definitions (a chart without remaining series is removed). Save writes the result to a new file.
 
 ## Analysis and modelling
 Analysis & Modelling opens a window to investigate the data further (requires scipy) with five tabs: Data Analysis (statistics, correlations, distributions and time series), Model Builder (linear, polynomial or your own formula), Physical Models (Penman-Monteith, Hargreaves, water balance, Newtonian cooling, pressure correction, Gaussian plume), Model Evaluation (R², RMSE, MAE, bias and residuals) and Simulation & Prediction (change parameters and see how the model responds).

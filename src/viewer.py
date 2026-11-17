@@ -596,7 +596,6 @@ class CampbellViewer:
         toolbar = ttk.Frame(self.root, style="Toolbar.TFrame", padding=(14, 10))
         toolbar.pack(fill="x")
         ttk.Button(toolbar, text=t("toolbar.open_data"), command=self._choose_another_file).pack(side="left")
-        ttk.Button(toolbar, text=t("toolbar.add_columns"), command=self._add_columns_from_file).pack(side="left", padx=(8, 0))
         ttk.Button(toolbar, text=t("toolbar.manage_columns"), command=self._manage_columns).pack(side="left", padx=(8, 0))
         ttk.Button(toolbar, text=t("toolbar.modelling"), command=self._open_modelling).pack(side="left", padx=(8, 0))
         ttk.Button(toolbar, text=t("toolbar.logdef_editor"), command=self._open_logdef_editor).pack(side="left", padx=(8, 0))
@@ -2519,13 +2518,20 @@ class CampbellViewer:
         ttk.Button(side, text=t("button.move_up"), command=lambda: move(-1)).pack(fill="x", pady=2)
         ttk.Button(side, text=t("button.move_down"), command=lambda: move(1)).pack(fill="x", pady=2)
         ttk.Button(side, text=t("button.delete"), command=delete).pack(fill="x", pady=(12, 2))
+        ttk.Button(
+            side, text=t("button.add_columns"),
+            command=lambda: self._add_columns_from_file(
+                parent=window, on_added=lambda: (window.destroy(), self._manage_columns())
+            ),
+        ).pack(fill="x", pady=(12, 2))
         ttk.Button(buttons, text=t("button.close"), command=window.destroy).pack(side="right")
         ttk.Button(buttons, text=t("button.apply"), command=apply).pack(side="right", padx=(0, 8))
         window.grab_set()
 
-    def _add_columns_from_file(self) -> None:
+    def _add_columns_from_file(self, parent=None, on_added=None) -> None:
+        parent = parent or self.root
         selected = filedialog.askopenfilename(
-            parent=self.root,
+            parent=parent,
             title=t("dialog.choose_extra_dat"),
             filetypes=[(t("filetype.data"), "*.dat *.csv *.txt"), (t("filetype.all"), "*.*")],
             initialdir=str(self.source.parent),
@@ -2538,10 +2544,10 @@ class CampbellViewer:
             extra_headers = int(extra.attrs.get("header_row_count", 0))
             prefix = logger_from_filename(source)
         except Exception as exc:
-            messagebox.showerror("Campbell Sci", str(exc), parent=self.root)
+            messagebox.showerror("Campbell Sci", str(exc), parent=parent)
             return
         available = [str(c) for c in extra.columns[1:]]
-        window = tk.Toplevel(self.root)
+        window = tk.Toplevel(parent)
         window.title(t("dialog.add_columns", name=source.name))
         window.transient(self.root)
         window.geometry("360x460")
@@ -2565,13 +2571,15 @@ class CampbellViewer:
                 )
             except Exception as exc:
                 window.destroy()
-                messagebox.showerror("Campbell Sci", str(exc), parent=self.root)
+                messagebox.showerror("Campbell Sci", str(exc), parent=parent)
                 return
             window.destroy()
             self.data = merged
             self.removed_columns -= {str(a).strip().casefold() for a in added}
             self._data_changed = True
             self.status.set(t("status.columns_added", count=len(added), name=source.name))
+            if on_added:
+                on_added()
             self._populate_tabs()
             self._last_selected_tab = self.notebook.select()
 
