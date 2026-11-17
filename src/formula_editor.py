@@ -151,7 +151,8 @@ class FormulaEditor(tk.Toplevel):
         top.pack(fill="x")
         ttk.Label(top, text=t("formula.new_column_name")).grid(row=0, column=0, sticky="w", pady=2)
         self.name_var = tk.StringVar()
-        ttk.Entry(top, textvariable=self.name_var).grid(row=0, column=1, sticky="ew", padx=6, pady=2)
+        self.name_entry = ttk.Entry(top, textvariable=self.name_var)
+        self.name_entry.grid(row=0, column=1, sticky="ew", padx=6, pady=2)
         ttk.Label(top, text=t("formula.formula")).grid(row=1, column=0, sticky="nw", pady=2)
         self.expression = tk.Text(top, height=4, wrap="word", font=("Consolas", 10))
         self.expression.grid(row=1, column=1, sticky="ew", padx=6, pady=2)
@@ -441,6 +442,11 @@ class FormulaEditor(tk.Toplevel):
         self.formulas.append({"name": t("formula.default_name", number=len(self.formulas) + 1), "expression": ""})
         self.formula_list.insert("end", self.formulas[-1]["name"])
         self._load(len(self.formulas) - 1)
+        self.after_idle(self._focus_name)
+
+    def _focus_name(self) -> None:
+        self.name_entry.focus_set()
+        self.name_entry.select_range(0, "end")
 
     def _remove(self) -> None:
         if self.current is None:

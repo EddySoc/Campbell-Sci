@@ -69,19 +69,31 @@ is not automatically applied.
 
 Series on the same plot:
 
-![Series on the same plot](screenshots/Graph%20zelfde%20as.dat.png)
+![Series on the same plot](screenshots/Graph%20zelfde%20as.png)
 
 Series on separate plots:
 
-![Series on separate plots](screenshots/Graph%20gesplitst.dat.png)
+![Series on separate plots](screenshots/Graph%20gesplitst.png)
 
 A chart with a secondary axis:
 
-![Chart with a secondary axis](screenshots/Graph%20herschaal.dat.png)
+![Chart with a secondary axis](screenshots/Graph%20herschaal.png)
 
 Wind rose:
 
-![Wind rose chart](screenshots/Graph%20windroos.dat.png)
+![Wind rose chart](screenshots/Graph%20windroos.png)
+
+A wind rose can also show concentrations per wind direction. Put the wind
+direction first in the chart's columns and add one or more concentration
+columns (for example `NO` and `NO2`). Each wind sector then shows the mean
+concentration for winds from that direction, as grouped bars. The columns may
+come from Data, Calc or Pivot; if the direction and the concentration are
+Pivot columns, they must use the same period.
+
+![Wind rose with concentrations](screenshots/Windroos%20vgl.png)
+
+Charts that cannot be built (for example because their columns contain no
+data or were removed) are not shown; one message lists all of them.
 
 For scatter charts choose exactly two columns, first Y and then X; this order
 preserves existing configurations. Optionally enable a linear trendline with
@@ -139,13 +151,62 @@ and `Configs/Functiedefs`.
 
 **Choose visible functions**
 
-![Choose visible functions](screenshots/Choice%20Visible%20functions.dat.png)
+![Choose visible functions](screenshots/Choice%20Visible%20functions.png)
+
+## Add, remove and reorder columns
+
+Use **Add columns** to add columns from another file of the same measurement
+period (for example IM_, WX_ or PA_ columns to a BM_ file). Choose the file,
+then the columns. The files are matched on identical timestamps; if no
+timestamp matches at all, a message is shown and nothing is added. Duplicate
+column names are prefixed with the logger name (for example `IM_T`).
+
+![Add columns](screenshots/Add%20columns.png)
+
+Use **Manage columns** to move columns up or down or delete them, then choose
+**Apply**. Deleted columns also disappear from charts and Pivot definitions
+(a chart without any remaining series is removed). **Save** writes the result
+to a new file.
+
+## Analysis & Modelling
+
+**Analysis & Modelling** opens a window for further research of the loaded data
+(needs `scipy`). It has five tabs:
+
+- **Data Analysis**: select variables, statistics, correlations and distributions.
+
+  ![Data Analysis](screenshots/Modelanalyser.png)
+
+- **Model Builder**: build a model (linear, polynomial or your own formula) for a
+  dependent variable as a function of time and other variables.
+
+  ![Model Builder](screenshots/ModelBuilder.png)
+
+- **Physical Models**: Penman-Monteith, Hargreaves, water balance, Newtonian
+  cooling, pressure correction and a Gaussian plume model.
+
+  ![Physical Models](screenshots/fysmodel.png)
+
+- **Model Evaluation**: compare model and measurements with R², RMSE, MAE, bias
+  and residual analysis.
+
+  ![Model Evaluation](screenshots/ModelEval.png)
+
+- **Simulation & Prediction**: change parameters or inputs (for example +2 °C)
+  and see how the model responds.
+
+  ![Simulation & Prediction](screenshots/Sim%26predict.png)
+
+Models can be saved and loaded with **Save model** and **Load model**
+(`Configs/Modeldefs`, `.modeldef`). All texts of the add-on are in the
+language files.
 
 ## Pivot tables
 
 Use **Pivot Editor** to define named columns from Data or Calc. Choose the
 source, aggregation (mean, sum, minimum, maximum, count or median) and period
-(minute, hour, day, week, month or year). Each result has one timestamp at the
+(15 seconds, 30 seconds, 1, 5, 10, 15 or 30 minutes, hour, day, week, month or
+year). Each result has one timestamp at the
 start of its period; weeks start on Monday. Missing numeric values are excluded
 from the calculations. Definitions are saved per logger and location in
 `Configs/Pivotdefs`, with the same fallback rules as formulas.

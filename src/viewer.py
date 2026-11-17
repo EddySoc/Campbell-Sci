@@ -21,9 +21,10 @@ from tkinter import font as tkfont
 from formulas import apply_formulas, load_formulas, load_funcdefs
 from app_config import prepare_external_configs
 from logdef_format import parse_chart_fields
-from pivots import PERIODS, calculate_pivots, load_pivots, pivot_path
+from pivots import PERIODS, calculate_pivots, load_pivots, period_start, pivot_path
 from i18n import available_languages, current_language, init_language, set_language as apply_language, t
 from settings import get_auto_scale_y, get_last_dir, set_auto_scale_y, set_language, set_last_dir
+import logging
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
@@ -137,6 +138,42 @@ def read_dat_file(file_path: str | Path) -> pd.DataFrame:
     data.columns = [str(column).strip() for column in data.columns]
     data.attrs["header_row_count"] = HEADER_ROWS if toa5_header_index is not None else 0
     return data
+
+
+def merge_columns_by_time(
+    base: pd.DataFrame, base_headers: int, extra: pd.DataFrame, extra_headers: int,
+    columns: list[str], prefix: str,
+) -> tuple[pd.DataFrame, list[str]]:
+    """Voegt kolommen uit `extra` toe aan `base`, gekoppeld op exact gelijke tijdstempels."""
+    base_times = pd.to_datetime(base.iloc[base_headers:, 0], format="mixed", errors="coerce")
+    extra_times = pd.to_datetime(extra.iloc[extra_headers:, 0], format="mixed", errors="coerce")
+    result = base.copy()
+    added: list[str] = []
+    existing = {str(c).casefold() for c in result.columns}
+    keep = extra_times.notna().to_numpy()
+    if not base_times.dropna().isin(extra_times.dropna()).any():
+        raise ValueError(t("err.no_timestamp_match"))
+    for column in columns:
+        name = column if column.casefold() not in existing else f"{prefix}_{column}"
+        suffix = 2
+        unique = name
+        while unique.casefold() in existing:
+            unique = f"{name}_{suffix}"
+            suffix += 1
+        values = pd.Series(extra.iloc[extra_headers:][column].to_numpy()[keep], index=extra_times[keep].to_numpy())
+        values = values[~values.index.duplicated(keep="last")]
+        matched = values.reindex(base_times.to_numpy()).to_numpy()
+        header_part = [
+            extra.iloc[row][column] if row < extra_headers else "" for row in range(base_headers)
+        ]
+        new_column = np.empty(len(base), dtype=object)
+        new_column[:base_headers] = header_part
+        new_column[base_headers:] = matched
+        result[unique] = new_column
+        existing.add(unique.casefold())
+        added.append(unique)
+    result.attrs.update(base.attrs)
+    return result, added
 
 
 def _format_toa5_cell(value: Any, na_text: str) -> Any:
@@ -459,6 +496,7 @@ class CampbellViewer:
         self.page = 0
         self.data2_page = 0
         self.chart_data = data
+        self.removed_columns: set[str] = set()
         self.calc_columns: list[str] = []
         self.formula_errors: list[str] = []
         self.pivot_frames: dict[str, pd.DataFrame] = {}
@@ -558,6 +596,9 @@ class CampbellViewer:
         toolbar = ttk.Frame(self.root, style="Toolbar.TFrame", padding=(14, 10))
         toolbar.pack(fill="x")
         ttk.Button(toolbar, text=t("toolbar.open_data"), command=self._choose_another_file).pack(side="left")
+        ttk.Button(toolbar, text=t("toolbar.add_columns"), command=self._add_columns_from_file).pack(side="left", padx=(8, 0))
+        ttk.Button(toolbar, text=t("toolbar.manage_columns"), command=self._manage_columns).pack(side="left", padx=(8, 0))
+        ttk.Button(toolbar, text=t("toolbar.modelling"), command=self._open_modelling).pack(side="left", padx=(8, 0))
         ttk.Button(toolbar, text=t("toolbar.logdef_editor"), command=self._open_logdef_editor).pack(side="left", padx=(8, 0))
         ttk.Button(toolbar, text=t("toolbar.formula_editor"), command=self._open_formula_editor).pack(side="left", padx=(8, 0))
         ttk.Button(toolbar, text=t("pivot.editor"), command=self._open_pivot_editor).pack(side="left", padx=(8, 0))
@@ -643,6 +684,7 @@ class CampbellViewer:
         specs = load_chart_config(self.logger, LOGDEF_DIR, location=self.location)
         if not specs:
             specs = _fallback_charts(self.chart_data)
+        specs = self._without_removed_columns(specs)
         if not specs:
             empty = ttk.Frame(self.notebook, padding=24)
             ttk.Label(empty, text=t("chart.no_numeric_columns")).pack(anchor="w")
@@ -657,6 +699,7 @@ class CampbellViewer:
         headers = _header_lookup(self.chart_data)
         headers.update({name.upper(): name for name in self.pivot_columns})
         used_names: set[str] = set()
+        failed_charts: list[str] = []
         for index, spec in enumerate(specs):
             name = spec["name"] or t("chart.default_name", number=index + 1)
             if name in used_names:
@@ -674,10 +717,40 @@ class CampbellViewer:
             try:
                 self._draw_chart(page, chart_spec, headers, self.chart_data)
             except (KeyError, ValueError) as exc:
-                ttk.Label(page, text=t("chart.cannot_build", error=exc), padding=24).pack(anchor="w")
+                self.notebook.forget(page)
+                page.destroy()
+                failed_charts.append(f"{name}: {exc}")
         self._refresh_tab_strip()
         if len(self.notebook.tabs()) > 3:
             self.notebook.select(self.notebook.tabs()[3])
+        if failed_charts:
+            message = t("chart.skipped", charts="\n".join(failed_charts))
+            self.root.after(200, lambda: messagebox.showwarning(t("chart.skipped_title"), message, parent=self.root))
+
+    def _without_removed_columns(self, specs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if not self.removed_columns:
+            return specs
+
+        def is_removed(configured: str) -> bool:
+            name = configured[:-10] if configured.lower().endswith("@secondary") else configured
+            return name.strip().casefold() in self.removed_columns
+
+        kept = []
+        for spec in specs:
+            columns = spec["columns"]
+            if not columns:
+                kept.append(spec)
+                continue
+            if spec.get("type") == "windroos":
+                if not is_removed(columns[0]):
+                    kept.append({**spec, "columns": [columns[0], *[c for c in columns[1:] if not is_removed(c)]]})
+                continue
+            remaining = [c for c in columns[1:] if not is_removed(c)]
+            # Scatter charts need both columns; other charts survive while a series remains.
+            if not remaining or (spec.get("type") == "scatter" and len(remaining) != len(columns) - 1):
+                continue
+            kept.append({**spec, "columns": [columns[0], *remaining]})
+        return kept
 
     def _refresh_tab_strip(self) -> None:
         for child in self.tab_strip.winfo_children():
@@ -727,6 +800,8 @@ class CampbellViewer:
             definitions = load_pivots(pivot_path(self.logger, self.location, PIVOT_DIR))
             available = []
             for definition in definitions:
+                if str(definition["column"]).strip().casefold() in getattr(self, "removed_columns", ()):
+                    continue
                 if definition["column"] not in self.chart_data.columns:
                     errors.append(t("err.column_not_in_data", name=definition["column"]))
                 else:
@@ -2005,6 +2080,45 @@ class CampbellViewer:
                       va="top", fontsize=9, color="#7B0000",
                       bbox={"facecolor": "white", "alpha": 0.8, "edgecolor": "none"})
 
+    def _aligned_wind(self, data: pd.DataFrame, direction: str, value: str) -> pd.DataFrame:
+        """Pair direction and value on a common time base; either may be a raw or a pivot column."""
+        direction_period = self.pivot_columns.get(direction)
+        value_period = self.pivot_columns.get(value)
+        if direction_period == value_period:
+            frame = self.pivot_frames[direction_period] if direction_period else data
+            if value not in frame.columns:
+                raise ValueError(t("err.column_not_in_data", name=value))
+            pair = pd.DataFrame({
+                "direction": pd.to_numeric(frame[direction], errors="coerce").mod(360),
+                "value": pd.to_numeric(frame[value], errors="coerce"),
+            })
+            return pair.dropna()
+        if direction_period and value_period:
+            raise ValueError(t("err.wind_period_mismatch"))
+        raw = data.iloc[self.header_row_count:]
+        raw_times = pd.to_datetime(raw.iloc[:, 0], format="mixed", errors="coerce")
+        if direction_period is None:
+            radians = np.deg2rad(pd.to_numeric(raw[direction], errors="coerce"))
+            stamps = period_start(raw_times, value_period)
+            parts = pd.DataFrame({"sin": np.sin(radians), "cos": np.cos(radians)}).groupby(stamps).mean()
+            mean_direction = np.rad2deg(np.arctan2(parts["sin"], parts["cos"])).mod(360)
+            frame = self.pivot_frames[value_period]
+            times = pd.to_datetime(frame.iloc[:, 0], errors="coerce")
+            pair = pd.DataFrame({
+                "direction": mean_direction.reindex(times).to_numpy(),
+                "value": pd.to_numeric(frame[value], errors="coerce").to_numpy(),
+            })
+            return pair.dropna()
+        frame = self.pivot_frames[direction_period]
+        times = pd.to_datetime(frame.iloc[:, 0], errors="coerce")
+        directions = pd.Series(pd.to_numeric(frame[direction], errors="coerce").mod(360).to_numpy(), index=times)
+        stamps = period_start(raw_times, direction_period)
+        pair = pd.DataFrame({
+            "direction": directions.reindex(stamps).to_numpy(),
+            "value": pd.to_numeric(raw[value], errors="coerce").to_numpy(),
+        })
+        return pair.dropna()
+
     def _draw_wind_rose(
         self,
         figure: Figure,
@@ -2023,6 +2137,39 @@ class CampbellViewer:
             raise ValueError(t("err.no_wind_values"))
         bins = 16
         width = 360 / bins
+        labels = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
+        angles = [index * math.tau / bins for index in range(bins)]
+        concentration_names = [name.strip() for name in spec["columns"][1:] if name.strip()]
+        if concentration_names:
+            figure.delaxes(axes)
+            polar_axes = figure.add_subplot(111, projection="polar")
+            polar_axes.set_theta_zero_location("N")
+            polar_axes.set_theta_direction(-1)
+            bar_width = math.tau / bins * 0.9
+            colors = ["#178B83", "#C2410C", "#1D4E89", "#7A3E9D", "#4D7C0F", "#B91C1C"]
+            series_means = []
+            for number, configured in enumerate(concentration_names):
+                name, _ = _resolve_header(headers, configured)
+                pair = self._aligned_wind(data, column, name)
+                sector = ((pair["direction"] + width / 2) // width).mod(bins)
+                means = pair["value"].groupby(sector).mean().reindex(range(bins))
+                if means.notna().sum() == 0:
+                    raise ValueError(t("err.no_wind_values"))
+                series_means.append((number, name, means))
+            # Grouped bars: each series gets its own slot, the group stays centred on the compass direction.
+            slot = bar_width / len(series_means)
+            for number, name, means in series_means:
+                offsets = [angle + (number - (len(series_means) - 1) / 2) * slot for angle in angles]
+                polar_axes.bar(
+                    offsets, means.fillna(0).to_numpy(), width=slot, label=name,
+                    color=colors[number % len(colors)], edgecolor="white", linewidth=0.5,
+                )
+            polar_axes.set_xticks(angles)
+            polar_axes.set_xticklabels(labels)
+            polar_axes.legend(loc="upper right", bbox_to_anchor=(1.25, 1.1))
+            polar_axes.set_title(spec["name"], loc="left", fontsize=13, fontweight="bold", color="#1F2D3A", pad=22)
+            polar_axes.set_ylabel(t("axis.mean_concentration"), labelpad=28)
+            return polar_axes
         counts = [0] * bins
         for direction in directions:
             index = int((float(direction) + width / 2) // width) % bins
@@ -2183,6 +2330,24 @@ class CampbellViewer:
         self._data_changed = False
         self.status.set(t("status.saved", name=path.name))
 
+    def _open_modelling(self) -> None:
+        try:
+            from addons.scientific_modelling.modelling_gui import open_modelling_window
+            window = open_modelling_window(
+                self.root, self.chart_data, self.header_row_count, self.source.name, CONFIGS_DIR / "Modeldefs",
+            )
+            if window is not None:
+                try:
+                    window.iconbitmap(str(application_icon_path()))
+                except tk.TclError:
+                    pass
+                window.deiconify()
+                window.lift()
+                window.focus_force()
+        except Exception as error:
+            logging.getLogger(__name__).exception("Modelling window failed")
+            messagebox.showerror(t("toolbar.modelling"), f"{type(error).__name__}: {error}", parent=self.root)
+
     def _open_pivot_editor(self) -> None:
         from pivot_editor import PivotEditor
         editor = PivotEditor(
@@ -2298,6 +2463,122 @@ class CampbellViewer:
 
         ttk.Button(content, text=t("button.close"), command=window.destroy).pack(side="bottom", anchor="e", pady=(12, 0))
 
+    def _manage_columns(self) -> None:
+        names = [str(c) for c in self.data.columns]
+        window = tk.Toplevel(self.root)
+        window.title(t("dialog.manage_columns"))
+        window.transient(self.root)
+        window.geometry("360x520")
+        buttons = ttk.Frame(window, padding=8)
+        buttons.pack(side="bottom", fill="x")
+        side = ttk.Frame(window, padding=8)
+        side.pack(side="right", fill="y")
+        listbox = tk.Listbox(window, selectmode="extended", exportselection=False)
+        listbox.pack(side="left", fill="both", expand=True)
+        for name in names[1:]:
+            listbox.insert("end", name)
+
+        def move(step: int) -> None:
+            selection = list(listbox.curselection())
+            if not selection:
+                return
+            order = range(len(selection)) if step < 0 else range(len(selection) - 1, -1, -1)
+            for i in order:
+                index = selection[i]
+                target = index + step
+                if target < 0 or target >= listbox.size() or target in selection:
+                    continue
+                text = listbox.get(index)
+                listbox.delete(index)
+                listbox.insert(target, text)
+                selection[i] = target
+            listbox.selection_clear(0, "end")
+            for index in selection:
+                listbox.selection_set(index)
+
+        def delete() -> None:
+            for index in reversed(listbox.curselection()):
+                listbox.delete(index)
+
+        def apply() -> None:
+            order = [names[0]] + list(listbox.get(0, "end"))
+            if order == names:
+                window.destroy()
+                return
+            removed = len(names) - len(order)
+            self.removed_columns |= {n.strip().casefold() for n in names if n not in order}
+            attrs = dict(self.data.attrs)
+            self.data = self.data[order].copy()
+            self.data.attrs.update(attrs)
+            self._data_changed = True
+            window.destroy()
+            self.status.set(t("status.columns_managed", removed=removed))
+            self._populate_tabs()
+            self._last_selected_tab = self.notebook.select()
+
+        ttk.Button(side, text=t("button.move_up"), command=lambda: move(-1)).pack(fill="x", pady=2)
+        ttk.Button(side, text=t("button.move_down"), command=lambda: move(1)).pack(fill="x", pady=2)
+        ttk.Button(side, text=t("button.delete"), command=delete).pack(fill="x", pady=(12, 2))
+        ttk.Button(buttons, text=t("button.close"), command=window.destroy).pack(side="right")
+        ttk.Button(buttons, text=t("button.apply"), command=apply).pack(side="right", padx=(0, 8))
+        window.grab_set()
+
+    def _add_columns_from_file(self) -> None:
+        selected = filedialog.askopenfilename(
+            parent=self.root,
+            title=t("dialog.choose_extra_dat"),
+            filetypes=[(t("filetype.data"), "*.dat *.csv *.txt"), (t("filetype.all"), "*.*")],
+            initialdir=str(self.source.parent),
+        )
+        if not selected:
+            return
+        source = Path(selected)
+        try:
+            extra = read_dat_file(source)
+            extra_headers = int(extra.attrs.get("header_row_count", 0))
+            prefix = logger_from_filename(source)
+        except Exception as exc:
+            messagebox.showerror("Campbell Sci", str(exc), parent=self.root)
+            return
+        available = [str(c) for c in extra.columns[1:]]
+        window = tk.Toplevel(self.root)
+        window.title(t("dialog.add_columns", name=source.name))
+        window.transient(self.root)
+        window.geometry("360x460")
+        listbox = tk.Listbox(window, selectmode="extended", exportselection=False)
+        scrollbar = ttk.Scrollbar(window, orient="vertical", command=listbox.yview)
+        listbox.configure(yscrollcommand=scrollbar.set)
+        buttons = ttk.Frame(window, padding=8)
+        buttons.pack(side="bottom", fill="x")
+        scrollbar.pack(side="right", fill="y")
+        listbox.pack(side="left", fill="both", expand=True)
+        for column in available:
+            listbox.insert("end", column)
+
+        def apply() -> None:
+            chosen = [available[i] for i in listbox.curselection()]
+            if not chosen:
+                return
+            try:
+                merged, added = merge_columns_by_time(
+                    self.data, self.header_row_count, extra, extra_headers, chosen, prefix,
+                )
+            except Exception as exc:
+                window.destroy()
+                messagebox.showerror("Campbell Sci", str(exc), parent=self.root)
+                return
+            window.destroy()
+            self.data = merged
+            self.removed_columns -= {str(a).strip().casefold() for a in added}
+            self._data_changed = True
+            self.status.set(t("status.columns_added", count=len(added), name=source.name))
+            self._populate_tabs()
+            self._last_selected_tab = self.notebook.select()
+
+        ttk.Button(buttons, text=t("button.close"), command=window.destroy).pack(side="right")
+        ttk.Button(buttons, text=t("button.add_columns"), command=apply).pack(side="right", padx=(0, 8))
+        window.grab_set()
+
     def _choose_another_file(self) -> None:
         selected = filedialog.askopenfilename(
             parent=self.root,
@@ -2317,6 +2598,7 @@ class CampbellViewer:
                 data = data.replace(["6999", "-6999", "7999", "-7999", "NAN", "INF"], float("nan"))
             self.data, self.source, self.logger, self.location, self.page = data, source, logger, location, 0
             self.data2_page = 0
+            self.removed_columns = set()
             self._data_changed = False
             self.root.title(f"Campbell Sci | {source.name}")
             self.file_label.configure(text=source.name)

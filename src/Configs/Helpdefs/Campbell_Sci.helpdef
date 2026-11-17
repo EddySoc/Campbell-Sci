@@ -8,7 +8,7 @@ De Data-tab toont de ingelezen meetwaarden. De andere tabs tonen grafieken uit d
 Scroll door de tabs met de pijltjes of met het muiswiel boven de tabstrook.
 
 ## Draaitabellen
-Open Pivot Editor en kies per kolom een bron uit Data of Calc, een berekening en een periode: minuut, uur, dag, week, maand of jaar. De tijdstippen vallen aan het begin van de periode; een week begint op maandag. Geef elke kolom een unieke naam. De Pivot-tab toont de kolommen van de gekozen periode. Met Pivot Formules maak je formules op diezelfde tijdsbasis.
+Open Pivot Editor en kies per kolom een bron uit Data of Calc, een berekening en een periode: 15 seconden, 30 seconden, 1, 5, 10, 15 of 30 minuten, uur, dag, week, maand of jaar. De tijdstippen vallen aan het begin van de periode; een week begint op maandag. Geef elke kolom een unieke naam. De Pivot-tab toont de kolommen van de gekozen periode. Met Pivot Formules maak je formules op diezelfde tijdsbasis.
 Gebruik Omhoog en Omlaag om de volgorde van de Pivot-kolommen te wijzigen.
 Pivot-kolommen zijn beschikbaar in de LogDef Editor. Meetreeksen en Pivot-reeksen kunnen in één tijdgrafiek worden getoond, ieder met hun eigen tijdstippen. In een scattergrafiek worden alleen exact overeenkomende tijdstippen gecombineerd. Definities staan in Configs/Pivotdefs en Pivot-formules in Configs/PivotFormuladefs.
 
@@ -24,6 +24,16 @@ Kies Staaf naast elkaar om reeksen per tijdstip naast elkaar te tonen. Kies Staa
 De donkere nullijn maakt negatieve waarden zichtbaar. Een Pivot-gemiddelde is het gemiddelde van alle beschikbare meetwaarden in de periode, niet het gemiddelde van alleen minimum en maximum.
 Gebruik de knoppen Omhoog en Omlaag onder de gekozen kolommen om hun volgorde aan te passen.
 Bij een scattergrafiek kies je precies twee kolommen: eerst Y (verticaal), daarna X (horizontaal). Een secundaire Y-as is hiervoor niet nodig. Vink Lineaire trendlijn aan om de regressielijn, vergelijking en R² te tonen. De lijn gebruikt alle geldige X/Y-punten; minstens twee verschillende X-waarden zijn nodig. Bij een constante Y is R² niet gedefinieerd. Bestaande scattergrafieken behouden hun assen.
+Bij een windroos is de eerste kolom de windrichting. Voeg je extra kolommen (concentraties, bijvoorbeeld NO en NO2) toe, dan toont elke windsector de gemiddelde concentratie bij wind uit die richting, als gegroepeerde staven. De kolommen mogen uit Data, Calc of Pivot komen; zijn richting en concentratie Pivot-kolommen, dan moeten ze dezelfde periode hebben.
+Grafieken die niet kunnen worden opgebouwd (bijvoorbeeld omdat hun kolommen geen data bevatten of verwijderd zijn) worden niet getoond; één melding somt ze allemaal op.
+
+## Kolommen toevoegen en beheren
+Met Kolommen toevoegen voeg je kolommen uit een ander bestand van dezelfde meetperiode toe (bijvoorbeeld IM_-, WX_- of PA_-kolommen aan een BM_-bestand). Kies het bestand en daarna de kolommen. De bestanden worden gekoppeld op identieke tijdstippen; komt er helemaal geen tijdstip overeen, dan verschijnt een melding en wordt er niets toegevoegd. Dubbele kolomnamen krijgen de loggernaam als voorvoegsel (bijvoorbeeld IM_T).
+Met Kolommen beheren verplaats je kolommen of verwijder je ze; bevestig met Toepassen. Verwijderde kolommen verdwijnen ook uit grafieken en Pivot-definities (een grafiek zonder resterende reeksen wordt verwijderd). Opslaan schrijft het resultaat naar een nieuw bestand.
+
+## Analyse en modelleren
+Analysis & Modelling opent een venster om de data verder te onderzoeken (vereist scipy) met vijf tabs: Data Analysis (statistieken, correlaties, verdelingen en tijdreeksen), Model Builder (lineair, polynomiaal of een eigen formule), Physical Models (Penman-Monteith, Hargreaves, waterbalans, Newtoniaanse afkoeling, drukcorrectie, Gaussiaanse pluim), Model Evaluation (R², RMSE, MAE, bias en residuen) en Simulation & Prediction (parameters aanpassen en de reactie van het model bekijken).
+Met Model opslaan en Model laden bewaar en hergebruik je modellen (Configs/Modeldefs, .modeldef).
 
 ## Navigeren in grafieken
 Gebruik het muiswiel boven de grafiek om horizontaal in of uit te zoomen. Plaats de muis boven de linker- of rechtermarge van de plot en gebruik het muiswiel om door de meetperiode te schuiven. Maximalisatie tijdens het scrollen is mogelijk door Y-as automatisch schalen aan te vinken.

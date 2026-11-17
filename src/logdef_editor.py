@@ -14,7 +14,7 @@ TIME_CHART_TYPES = {"line", "bar", "bar_grouped", "bar_range", "bar_grouped_rang
 COLORS = ["", "red", "blue", "cyan", "yellow", "green", "orange", "purple", "gray", "black"]
 HEADER = (
     "# name;type;columns;minimum;maximum;number format;tab color\n"
-    "# type=windroos uses one direction-column header in columns; omit the line for loggers without a windrose.\n"
+    "# type=windroos: first column = wind direction; optional extra columns = concentrations (mean per direction); omit the line for loggers without a windrose.\n"
     "# tab color: hex code or a readable color name\n"
     "# optional eighth field: linear (scatter trendline)\n"
 )
@@ -99,7 +99,8 @@ class LogdefEditor(tk.Toplevel):
         self.format_var = tk.StringVar(value="0.0")
         self.color_var = tk.StringVar()
         self.trend_var = tk.BooleanVar(value=False)
-        rows = [(t("logdef.name"), ttk.Entry(form, textvariable=self.name_var)),
+        self.name_entry = ttk.Entry(form, textvariable=self.name_var)
+        rows = [(t("logdef.name"), self.name_entry),
                 (t("logdef.type"), ttk.Combobox(form, textvariable=self.type_var, values=list(self.type_labels.values()), state="readonly")),
                 (t("logdef.minimum"), ttk.Entry(form, textvariable=self.min_var)),
                 (t("logdef.maximum"), ttk.Entry(form, textvariable=self.max_var)),
@@ -207,6 +208,12 @@ class LogdefEditor(tk.Toplevel):
         self.charts.append(new_chart(len(self.charts) + 1))
         self.chart_list.insert("end", self.charts[-1]["name"])
         self._load(len(self.charts) - 1)
+        self.after_idle(self._focus_name)
+
+    def _focus_name(self) -> None:
+        self.name_entry.focus_set()
+        self.name_entry.select_range(0, "end")
+        self.name_entry.icursor("end")
 
     def _remove_chart(self) -> None:
         if self.current is None:
@@ -237,13 +244,10 @@ class LogdefEditor(tk.Toplevel):
         if secondary and self._chart_type() == "scatter":
             return
         existing = {c.split("@")[0] for c in self.selected.get(0, "end")}
-        single = self._chart_type() == "windroos"
         for index in self.available.curselection():
             header = self.headers[index]
             if header in existing:
                 continue
-            if single:
-                self.selected.delete(0, "end")
             self.selected.insert("end", f"{header}@secondary" if secondary and self._chart_type() == "line" else header)
             existing.add(header)
 

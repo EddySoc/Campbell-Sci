@@ -9,7 +9,11 @@ import pandas as pd
 from formulas import backup_original, formula_candidates
 from i18n import t
 
-PERIODS = ("minute", "hour", "day", "week", "month", "year")
+PERIODS = ("second15", "second30", "minute", "minute5", "minute10", "minute15", "minute30", "hour", "day", "week", "month", "year")
+MINUTE_FREQUENCIES = {
+    "second15": "15s", "second30": "30s", "minute": "1min", "minute5": "5min",
+    "minute10": "10min", "minute15": "15min", "minute30": "30min",
+}
 AGGREGATIONS = ("mean", "sum", "min", "max", "count", "median")
 
 
@@ -52,6 +56,20 @@ def save_pivots(path: Path, definitions: list[dict[str, str]]) -> None:
     path.write_text(json.dumps(definitions, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def period_start(times: pd.Series, period: str) -> pd.Series:
+    if period in MINUTE_FREQUENCIES:
+        return times.dt.floor(MINUTE_FREQUENCIES[period])
+    if period == "hour":
+        return times.dt.floor("h")
+    if period == "day":
+        return times.dt.normalize()
+    if period == "week":
+        return times.dt.normalize() - pd.to_timedelta(times.dt.day_of_week, unit="D")
+    if period == "month":
+        return times.dt.to_period("M").dt.to_timestamp()
+    return times.dt.to_period("Y").dt.to_timestamp()
+
+
 def calculate_pivots(data: pd.DataFrame, header_rows: int, definitions: list[dict[str, str]]) -> dict[str, pd.DataFrame]:
     definitions = validate_pivots(definitions)
     if not definitions:
@@ -74,19 +92,7 @@ def calculate_pivots(data: pd.DataFrame, header_rows: int, definitions: list[dic
         invalid_times = int((times.isna() & values.notna()).sum())
         if invalid_times:
             raise ValueError(t("pivot.invalid_times", name=column, count=invalid_times))
-        stamps = times
-        if period == "minute":
-            stamps = times.dt.floor("min")
-        elif period == "hour":
-            stamps = times.dt.floor("h")
-        elif period == "day":
-            stamps = times.dt.normalize()
-        elif period == "week":
-            stamps = times.dt.normalize() - pd.to_timedelta(times.dt.day_of_week, unit="D")
-        elif period == "month":
-            stamps = times.dt.to_period("M").dt.to_timestamp()
-        else:
-            stamps = times.dt.to_period("Y").dt.to_timestamp()
+        stamps = period_start(times, period)
         grouped = values.groupby(pd.Series(stamps, index=source.index), sort=True)
         series = grouped.sum(min_count=1) if aggregation == "sum" else getattr(grouped, aggregation)()
         series.name = name

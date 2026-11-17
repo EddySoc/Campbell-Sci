@@ -25,6 +25,7 @@ class PivotEditor(tk.Toplevel):
             return
         self.current: int | None = None
         self.new_indices: set[int] = set()
+        self.default_names: set[str] = set()
         left = ttk.Frame(self, padding=8)
         left.pack(side="left", fill="y")
         self.listbox = tk.Listbox(left, exportselection=False, width=28)
@@ -42,8 +43,9 @@ class PivotEditor(tk.Toplevel):
         self.aggregation = tk.StringVar()
         self.period_labels = [t(f"pivot.period.{value}") for value in PERIODS]
         self.aggregation_labels = [t(f"pivot.aggregation.{value}") for value in AGGREGATIONS]
+        self.name_entry = ttk.Entry(form, textvariable=self.name)
         rows = [
-            (t("pivot.name"), ttk.Entry(form, textvariable=self.name)),
+            (t("pivot.name"), self.name_entry),
             (t("pivot.source"), ttk.Combobox(form, textvariable=self.column, values=list(data.columns[1:]), state="readonly")),
             (t("pivot.interval"), ttk.Combobox(form, textvariable=self.period, values=self.period_labels, state="readonly")),
             (t("pivot.function"), ttk.Combobox(form, textvariable=self.aggregation, values=self.aggregation_labels, state="readonly")),
@@ -91,10 +93,18 @@ class PivotEditor(tk.Toplevel):
 
     def _add(self) -> None:
         self._commit()
-        self.definitions.append({"name": "", "column": "", "period": "day", "aggregation": "mean"})
+        name = t("pivot.unnamed", number=len(self.definitions) + 1)
+        self.default_names.add(name)
+        self.definitions.append({"name": name, "column": "", "period": "day", "aggregation": "mean"})
         self.new_indices.add(len(self.definitions) - 1)
         self.listbox.insert("end", t("pivot.unnamed", number=len(self.definitions)))
         self._load(len(self.definitions) - 1)
+        self.after_idle(self._focus_name)
+
+    def _focus_name(self) -> None:
+        self.name_entry.focus_set()
+        self.name_entry.select_range(0, "end")
+        self.name_entry.icursor("end")
 
     def _remove(self) -> None:
         if self.current is None:
@@ -130,8 +140,8 @@ class PivotEditor(tk.Toplevel):
         definitions = []
         for index, definition in enumerate(self.definitions):
             if index in self.new_indices and definition == {
-                "name": "", "column": "", "period": "day", "aggregation": "mean",
-            }:
+                "name": definition["name"], "column": "", "period": "day", "aggregation": "mean",
+            } and (not definition["name"] or definition["name"] in self.default_names):
                 continue
             missing = [
                 (field_index, label)

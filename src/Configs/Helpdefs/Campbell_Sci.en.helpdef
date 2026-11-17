@@ -8,7 +8,7 @@ The Data tab shows the loaded measurements. The Calc tab shows the columns calcu
 Scroll through the tabs using the arrows or the mouse wheel over the tab strip.
 
 ## Pivot tables
-Open Pivot Editor and choose a source column from Data or Calc, an aggregation and a period: minute, hour, day, week, month or year. Timestamps are at the start of each period; weeks start on Monday. Give every column a unique name. The Pivot tab shows the columns of the selected period. Use Pivot Formulas to create formulas on that same time basis.
+Open Pivot Editor and choose a source column from Data or Calc, an aggregation and a period: 15 seconds, 30 seconds, 1, 5, 10, 15 or 30 minutes, hour, day, week, month or year. Timestamps are at the start of each period; weeks start on Monday. Give every column a unique name. The Pivot tab shows the columns of the selected period. Use Pivot Formulas to create formulas on that same time basis.
 Use Up and Down to change the order of the Pivot columns.
 Pivot columns are available in LogDef Editor. Measurements and Pivot series can share a time chart while each keeps its own timestamps. Scatter charts combine only exactly matching timestamps. Definitions are stored in Configs/Pivotdefs and Pivot formulas in Configs/PivotFormuladefs.
 
@@ -24,6 +24,16 @@ Choose Grouped bars to display series side by side for each timestamp. Choose Mi
 The dark zero line makes negative values visible. A Pivot mean is the average of all available measurements in the period, not the average of only the minimum and maximum.
 Use the Up and Down buttons below the selected columns to change their order.
 For a scatter chart select exactly two columns: first Y (vertical), then X (horizontal). A secondary Y axis is not needed. Enable Linear trendline to show the regression line, equation and R². The line uses all valid X/Y points; at least two distinct X values are required. R² is undefined for constant Y. Existing scatter charts keep their axes.
+For a wind rose the first column is the wind direction. If you add extra columns (concentrations, for example NO and NO2), each wind sector shows the mean concentration for winds from that direction, as grouped bars. The columns may come from Data, Calc or Pivot; if direction and concentration are Pivot columns they must use the same period.
+Charts that cannot be built (for example because their columns contain no data or were removed) are not shown; one message lists all of them.
+
+## Adding and managing columns
+Use Add columns to add columns from another file of the same measurement period (for example IM_, WX_ or PA_ columns to a BM_ file). Choose the file and then the columns. The files are matched on identical timestamps; if no timestamp matches at all, a message is shown and nothing is added. Duplicate column names are prefixed with the logger name (for example IM_T).
+Use Manage columns to move or delete columns and confirm with Apply. Deleted columns also disappear from charts and Pivot definitions (a chart without remaining series is removed). Save writes the result to a new file.
+
+## Analysis and modelling
+Analysis & Modelling opens a window to investigate the data further (requires scipy) with five tabs: Data Analysis (statistics, correlations, distributions and time series), Model Builder (linear, polynomial or your own formula), Physical Models (Penman-Monteith, Hargreaves, water balance, Newtonian cooling, pressure correction, Gaussian plume), Model Evaluation (R², RMSE, MAE, bias and residuals) and Simulation & Prediction (change parameters and see how the model responds).
+Use Save model and Load model to keep and reuse models (Configs/Modeldefs, .modeldef).
 
 ## Navigating charts
 Use the mouse wheel over the chart to zoom in or out horizontally. Place the mouse over the left or right margin of the plot and use the mouse wheel to scroll through the measurement period. Hovering over a point on a line shows its column, time and value next to the cursor. Check Auto-scale Y axis when zooming to rescale the Y axis while scrolling.
