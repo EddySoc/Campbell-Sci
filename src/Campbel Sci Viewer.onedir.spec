@@ -6,7 +6,7 @@ from PyInstaller.utils.hooks import collect_submodules
 
 project_dir = Path(SPECPATH)
 icon_path = project_dir.parent / 'screenshots' / 'CampBell Icon.ico'
-hidden = collect_submodules('addons') + collect_submodules('scipy')
+hidden = collect_submodules('addons')
 
 a = Analysis(
     [str(project_dir / 'main.py')],
@@ -17,7 +17,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['torch', 'tensorboard', 'dask', 'jax', 'tensorflow', 'IPython', 'pytest'],
     noarchive=False,
     optimize=0,
 )

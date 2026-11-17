@@ -32,6 +32,6 @@ def prepare_external_configs() -> None:
         destination = CONFIGS_DIR / source.relative_to(bundled_configs)
         if source.is_dir():
             destination.mkdir(parents=True, exist_ok=True)
-        elif not destination.exists():
+        elif source.parent.name in {"Langdefs", "Helpdefs"} or not destination.exists():
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination)

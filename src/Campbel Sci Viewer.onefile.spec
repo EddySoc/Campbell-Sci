@@ -14,11 +14,11 @@ a = Analysis(
         (str(project_dir / 'Configs'), 'Configs'),
         (str(icon_path), '.'),
     ],
-    hiddenimports=collect_submodules('addons') + collect_submodules('scipy'),
+    hiddenimports=collect_submodules('addons'),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['torch', 'tensorboard', 'dask', 'jax', 'tensorflow', 'IPython', 'pytest'],
     noarchive=False,
     optimize=0,
 )
